@@ -5,6 +5,8 @@ import { getCanvasForUser, setCanvasThumbnailForUser } from "@/lib/canvas/repo";
 import { env } from "@/lib/env";
 import { decideThumbnailStorage, parsePngDataUrl, thumbnailBodySchema } from "@/lib/export/thumbnail-storage";
 import { uploadThumbnailToSupabase } from "@/lib/export/thumbnail-upload";
+import { log } from "@/lib/log";
+import { rateLimited } from "@/lib/rate-limit";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -17,6 +19,7 @@ type Context = { params: Promise<{ id: string }> };
 export async function POST(req: Request, { params }: Context) {
   const { userId } = await auth();
   if (!userId) return jsonError(401, "unauthorized");
+  const limited = rateLimited(userId, "canvases"); if (limited) return limited;
   const { id } = await params;
   if (!isCanvasId(id)) return jsonError(404, "not_found");
 
@@ -44,7 +47,7 @@ export async function POST(req: Request, { params }: Context) {
         bytes: Buffer.from(png.png.base64, "base64"),
       });
     } catch (error) {
-      console.error("[thumbnail] upload failed", error instanceof Error ? error.message : error);
+      log.error("api/canvases/thumbnail upload failed", { err: error });
       return jsonError(502, "upload_failed");
     }
   } else {

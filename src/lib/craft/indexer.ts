@@ -15,6 +15,7 @@
 import { and, eq, inArray, notInArray, sql } from "drizzle-orm";
 
 import { craftConnections, craftDocuments, getDb, type CraftDocument as CraftDocumentRow } from "@/db";
+import { log } from "@/lib/log";
 
 import { mapWithConcurrency } from "./concurrency";
 import { getConnectionForUser, markUnauthorized, runWithConnection, type LoadedConnection } from "./connection";
@@ -97,7 +98,7 @@ export async function startFullRefresh(userId: string, opts: RefreshOptions = {}
   const loaded = await prepare(userId, opts);
   const run = track(userId, runFullRefresh(loaded, opts));
   run.catch((err: unknown) => {
-    console.error("[craft/indexer] background refresh failed", err instanceof Error ? `${err.name}: ${err.message}` : err);
+    log.error("craft/indexer background refresh failed", { err });
   });
   return { started: true, alreadyRunning: false };
 }

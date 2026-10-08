@@ -20,12 +20,15 @@ import { addCraftDocument } from "@/hooks/useCraftPreviews";
 import { cardOriginAt, rectCentre } from "@/lib/canvas/drop";
 import { DEFAULT_SIZES } from "@/lib/canvas/types";
 import { selectDocIdsOnCanvas, useCanvasStore } from "@/store/canvas-store";
+import { useUiStore } from "@/store/ui-store";
 
 export type NotesPanelSlotProps = { canvasId: string };
 
 export function NotesPanelSlot({ canvasId }: NotesPanelSlotProps) {
   const nodes = useCanvasStore((s) => s.nodes);
   const docIdsOnCanvas = useMemo(() => selectDocIdsOnCanvas({ nodes }), [nodes]);
+  // The canvas page shows the full-width reconnect banner when this is true; the panel then stays quiet.
+  const canvasBannerVisible = useUiStore((s) => s.craft.unauthorized);
   const rf = useReactFlow();
   const flowStore = useStoreApi();
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -43,7 +46,12 @@ export function NotesPanelSlot({ canvasId }: NotesPanelSlotProps) {
 
   return (
     <div data-notes-panel data-canvas-id={canvasId} className="flex h-full min-h-0 flex-col">
-      <NotesPanel docIdsOnCanvas={docIdsOnCanvas} onAddDocument={onAddDocument} searchInputRef={searchInputRef} />
+      <NotesPanel
+        docIdsOnCanvas={docIdsOnCanvas}
+        onAddDocument={onAddDocument}
+        searchInputRef={searchInputRef}
+        hideReconnectBanner={canvasBannerVisible}
+      />
     </div>
   );
 }

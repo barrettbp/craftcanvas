@@ -7,6 +7,7 @@ import { ConnectionCard, type ConnectionSummary } from "@/components/settings/Co
 import { DeleteAccountSection } from "@/components/settings/DeleteAccountSection";
 import { findConnectionForUser } from "@/lib/craft/connection";
 import { countDocuments, isRefreshInFlight } from "@/lib/craft/indexer";
+import { log } from "@/lib/log";
 
 export const metadata = { title: "Settings" };
 export const dynamic = "force-dynamic";
@@ -27,7 +28,7 @@ async function loadSummary(userId: string): Promise<{ summary: ConnectionSummary
       },
     };
   } catch (err) {
-    console.error("[settings] could not load connection", err instanceof Error ? err.message : err);
+    log.error("settings could not load connection", { err });
     return { summary: null, error: "Could not load your Craft connection right now." };
   }
 }

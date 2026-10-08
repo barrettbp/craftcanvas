@@ -5,6 +5,7 @@ import { Webhook } from "svix";
 
 import { getDb, users } from "@/db";
 import { env } from "@/lib/env";
+import { log } from "@/lib/log";
 
 /**
  * Clerk webhook (delivered through svix).
@@ -35,7 +36,7 @@ export async function POST(req: Request) {
       "svix-signature": svixSignature,
     });
   } catch (err) {
-    console.error("[webhooks/clerk] verification failed", err instanceof Error ? err.message : err);
+    log.warn("api/webhooks/clerk verification failed", { err });
     return NextResponse.json({ error: "invalid_signature" }, { status: 400 });
   }
 

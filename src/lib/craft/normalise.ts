@@ -1,18 +1,57 @@
 /**
  * All parsing of raw Craft Connect API responses lives here.
  *
- * ASSUMPTION (adjust once real responses have been seen):
- * The exact JSON shapes of connect.craft.do are not documented in the spec, so
- * every function below is written defensively:
+ * ASSUMPTIONS TO CONFIRM AGAINST REAL CRAFT RESPONSES
+ * ---------------------------------------------------
+ * The spec (docs/FEATURE_SPEC.md section 7) names four endpoints but not their
+ * JSON shapes, and the Craft developer docs were not reachable while this was
+ * written. Every function below therefore accepts several plausible shapes and
+ * never throws on an unknown one. When a real connection is available, capture
+ * one response per endpoint and check each point; `normalise.test.ts` is the
+ * place to pin the confirmed shape.
  *
- * - A list may come back as a bare array, or wrapped in `{ folders }`,
- *   `{ documents }`, `{ items }`, `{ results }`, or `{ data }`.
- * - A folder is `{ id, name | title, parentId | parentFolderId | parent, path? }`.
- * - A document is `{ id | documentId, title | name, folderId | location | parentId,
- *   updatedAt | lastModifiedAt | modifiedAt | updated_at (ISO string or epoch),
- *   url | webUrl | shareUrl | link }`.
- * - Markdown may come back as a plain `text/markdown` body, or as JSON with a
- *   `markdown` / `content` / `text` string field.
+ *   GET /folders
+ *     [ ] Top level: bare array, or an object wrapping it under `folders`,
+ *         `items`, `results`, `data` or `list` (one level of nesting is also
+ *         tried, e.g. `{ data: { folders: [...] } }`).
+ *     [ ] Folder id key: `id` | `folderId` | `folder_id`.
+ *     [ ] Folder name key: `name` | `title` | `label`.
+ *     [ ] Parent: `parentId` | `parentFolderId` | `parent_id` | `parent`
+ *         (string id, or an object with an id), or nested `children` /
+ *         `folders` / `subfolders` arrays. `path` is used when present,
+ *         otherwise built by walking parents.
+ *     [ ] Space id for deep links (`extractSpaceId`): `spaceId` | `space_id`
+ *         or `space.id` on the top level object. If Craft never includes it,
+ *         deep links omit `spaceId` (spec section 14, question 2).
+ *
+ *   GET /documents?location=<folderId>  and  GET /documents/search?q=<text>
+ *     [ ] `location` is passed through untouched; confirm it takes a folder id
+ *         (and what, if anything, lists the root; the indexer tolerates a
+ *         400/404 for the root listing).
+ *     [ ] Same list wrappers as above, plus `documents` / `docs`.
+ *     [ ] Document id key: `id` | `documentId` | `document_id` | `docId` | `blockId`.
+ *     [ ] Title key: `title` | `name` | `documentTitle`.
+ *     [ ] Folder: `folderId` | `folder_id` | `location` | `parentId` | `parent_id`,
+ *         or a `folder` object with an id and optional `path`.
+ *     [ ] Updated time: `updatedAt` | `lastModifiedAt` | `modifiedAt` |
+ *         `updated_at` | `lastModified` | `modified`, as an ISO string or an
+ *         epoch in seconds or milliseconds.
+ *     [ ] Web share link: `webUrl` | `url` | `shareUrl` | `share_url` | `link` |
+ *         `clickableLink`; only http(s) values are kept.
+ *
+ *   GET /blocks?documentId=<id>  with  Accept: text/markdown
+ *     [ ] Body is plain markdown. If Craft answers JSON instead, a top level
+ *         `markdown` | `content` | `text` | `body` string is used, else the
+ *         `markdown` | `content` | `text` of each block under `blocks` /
+ *         `content` is joined with blank lines.
+ *     [ ] A deleted document answers 404 (the client maps it to
+ *         `CraftNotFoundError`, which the card shows as "Missing in Craft").
+ *     [ ] A revoked key answers 401 or 403 (`CraftUnauthorizedError`).
+ *
+ * Failure behaviour: a non JSON body where JSON was expected throws
+ * `CraftRequestError` in client.ts, which route handlers map to 502
+ * `craft_error`; an unrecognised but valid JSON shape yields an empty list or
+ * an empty string here. Nothing in this module throws.
  *
  * Missing fields never throw; they fall back to "" or `undefined`.
  */

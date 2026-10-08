@@ -28,6 +28,8 @@ export type NotesPanelProps = {
   onAddDocument: (doc: NotesPanelDocument) => void;
   /** Lets the canvas focus the search box (Cmd/Ctrl K). */
   searchInputRef?: React.Ref<HTMLInputElement>;
+  /** True when the host page already shows a reconnect banner, so the panel does not repeat it. */
+  hideReconnectBanner?: boolean;
 };
 
 type Row = { id: string; title: string; folderPath: string; updatedAt: string | null; missing?: boolean };
@@ -57,7 +59,7 @@ async function apiGet<T>(url: string, signal?: AbortSignal): Promise<FetchOutcom
   }
 }
 
-export function NotesPanel({ docIdsOnCanvas, onAddDocument, searchInputRef }: NotesPanelProps) {
+export function NotesPanel({ docIdsOnCanvas, onAddDocument, searchInputRef, hideReconnectBanner = false }: NotesPanelProps) {
   const [status, setStatus] = useState<CraftStatusResponse | null>(null);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
@@ -303,7 +305,7 @@ export function NotesPanel({ docIdsOnCanvas, onAddDocument, searchInputRef }: No
         </label>
       </div>
 
-      {unauthorized ? (
+      {unauthorized && !hideReconnectBanner ? (
         <div className="p-2">
           <ReconnectBanner compact />
         </div>

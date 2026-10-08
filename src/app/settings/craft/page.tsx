@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { TopBar } from "@/components/app-shell/TopBar";
 import { CraftConnectForm } from "@/components/settings/CraftConnectForm";
 import { findConnectionForUser } from "@/lib/craft/connection";
+import { log } from "@/lib/log";
 
 export const metadata = { title: "Connect Craft" };
 export const dynamic = "force-dynamic";
@@ -52,7 +53,7 @@ export default async function SettingsCraftPage() {
     const connection = await findConnectionForUser(userId);
     if (connection) existing = { label: connection.label, host: connection.host, status: connection.status };
   } catch (err) {
-    console.error("[settings/craft] could not load connection", err instanceof Error ? err.message : err);
+    log.error("settings/craft could not load connection", { err });
   }
 
   return (

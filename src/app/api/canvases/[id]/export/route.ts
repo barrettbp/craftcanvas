@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { coerceData, isCanvasId, jsonError } from "@/lib/canvas/api";
 import { getCanvasForUser } from "@/lib/canvas/repo";
 import { CANVAS_FILE_MIME, contentDisposition, filenameFor, serialiseCanvasFile } from "@/lib/export/canvas-file";
+import { rateLimited } from "@/lib/rate-limit";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -10,6 +11,7 @@ type Context = { params: Promise<{ id: string }> };
 export async function GET(_req: Request, { params }: Context) {
   const { userId } = await auth();
   if (!userId) return jsonError(401, "unauthorized");
+  const limited = rateLimited(userId, "canvases"); if (limited) return limited;
   const { id } = await params;
   if (!isCanvasId(id)) return jsonError(404, "not_found");
   const row = await getCanvasForUser(userId, id);
