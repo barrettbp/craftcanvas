@@ -1,19 +1,36 @@
-import { TopBar } from "@/components/app-shell/TopBar";
+import { auth } from "@clerk/nextjs/server";
+import { notFound, redirect } from "next/navigation";
+import { cache } from "react";
 
-export const metadata = { title: "Canvas" };
+import { CanvasEditor } from "@/components/canvas/CanvasEditor";
+import { isCanvasId, toDetail } from "@/lib/canvas/api";
+import { getCanvasForUser } from "@/lib/canvas/repo";
 
-// Placeholder. WP1 replaces this with the React Flow canvas page.
+export const dynamic = "force-dynamic";
+
+/** One query per request, shared between `generateMetadata` and the page. */
+const loadCanvas = cache(getCanvasForUser);
+
+export async function generateMetadata({ params }: PageProps<"/canvas/[id]">) {
+  const { id } = await params;
+  const { userId } = await auth();
+  if (!userId || !isCanvasId(id)) return { title: "Canvas" };
+  const row = await loadCanvas(userId, id);
+  return { title: row?.title ?? "Canvas" };
+}
+
+/**
+ * Loads the canvas server side, scoped by the Clerk user (404 when missing or
+ * owned by someone else), and hydrates the client editor.
+ */
 export default async function CanvasPage({ params }: PageProps<"/canvas/[id]">) {
   const { id } = await params;
-  return (
-    <>
-      <TopBar />
-      <main className="flex flex-1 flex-col gap-2 px-6 py-10">
-        <h1 className="text-2xl font-semibold tracking-tight">Canvas</h1>
-        <p className="text-zinc-600 dark:text-zinc-400">
-          The infinite canvas for <code className="font-mono text-sm">{id}</code> will render here.
-        </p>
-      </main>
-    </>
-  );
+  const { userId } = await auth();
+  if (!userId) redirect("/sign-in");
+  if (!isCanvasId(id)) notFound();
+
+  const row = await loadCanvas(userId, id);
+  if (!row) notFound();
+
+  return <CanvasEditor canvas={toDetail(row)} />;
 }
