@@ -61,6 +61,10 @@ export type CraftStatusResponse = {
   documentCount: number;
   /** True while a full refresh is running in this server process. */
   syncing: boolean;
+  /** Id of the `craft_connections` row (stored on file nodes). Absent when not connected. */
+  connectionId?: string | null;
+  /** Craft space id when the index found one (used for `craftdocs://` deep links). */
+  spaceId?: string | null;
 };
 
 /** Rows returned by `GET /api/craft/search`. */

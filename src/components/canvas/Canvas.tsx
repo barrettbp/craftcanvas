@@ -23,11 +23,13 @@ import {
   type OnNodeDrag,
   type Viewport,
 } from "@xyflow/react";
-import { useCallback, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useState, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from "react";
 
 import { useCanvasShortcuts } from "@/hooks/useCanvasShortcuts";
+import { addCraftDocument } from "@/hooks/useCraftPreviews";
 import { resolveColor } from "@/lib/canvas/colors";
 import { absoluteRects, type FlowEdge, type FlowNode } from "@/lib/canvas/convert";
+import { cardOriginAt, hasDocDrag, parseDocDrop } from "@/lib/canvas/drop";
 import { getHelperLines } from "@/lib/canvas/helper-lines";
 import { DEFAULT_SIZES, GRID_SIZE } from "@/lib/canvas/types";
 import { useCanvasStore } from "@/store/canvas-store";
@@ -178,8 +180,27 @@ export function Canvas({ containerRef }: { containerRef: React.RefObject<HTMLDiv
     useCanvasStore.getState().setViewport(viewport);
   }, []);
 
+  /** Notes panel rows dropped on the pane become note cards where the pointer lands (spec 8.6). */
+  const onDragOver = useCallback((e: ReactDragEvent<HTMLDivElement>) => {
+    if (!hasDocDrag(e.dataTransfer)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const onDrop = useCallback(
+    (e: ReactDragEvent<HTMLDivElement>) => {
+      const doc = parseDocDrop(e.dataTransfer);
+      if (!doc) return;
+      e.preventDefault();
+      closeContextMenu();
+      const point = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      addCraftDocument(doc, cardOriginAt(point, DEFAULT_SIZES.file));
+    },
+    [rf, closeContextMenu],
+  );
+
   return (
-    <div ref={containerRef} className="relative h-full w-full" onDoubleClick={onPaneDoubleClick}>
+    <div ref={containerRef} className="relative h-full w-full" onDoubleClick={onPaneDoubleClick} onDragOver={onDragOver} onDrop={onDrop}>
       <ReactFlow<FlowNode, FlowEdge>
         className={`cc-flow ${connecting ? "cc-connecting" : ""}`}
         nodes={nodes}

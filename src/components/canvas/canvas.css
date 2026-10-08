@@ -41,6 +41,74 @@
   overflow: hidden;
 }
 
+/* Note card chrome (spec 8.2) */
+.cc-card--missing {
+  opacity: 0.6;
+  filter: grayscale(1);
+}
+.cc-card__actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--cc-border);
+  background: var(--cc-card);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.cc-flow .react-flow__node:hover .cc-card__actions,
+.cc-flow .react-flow__node.selected .cc-card__actions,
+.cc-card__actions:focus-within {
+  opacity: 1;
+}
+.cc-card__popover {
+  position: absolute;
+  top: 36px;
+  right: 6px;
+  z-index: 3;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--cc-border);
+  background: var(--cc-card);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+.cc-card__badge {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  z-index: 2;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--cc-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+.cc-card__hint {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  left: 8px;
+  z-index: 3;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--cc-text);
+  color: var(--cc-card);
+  font-size: 11px;
+  line-height: 15px;
+}
+
 .cc-group {
   position: relative;
   box-sizing: border-box;

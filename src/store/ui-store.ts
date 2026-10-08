@@ -13,6 +13,15 @@ export type ContextMenuState =
   | { kind: "node"; x: number; y: number; id: string }
   | { kind: "edge"; x: number; y: number; id: string };
 
+/** What the canvas page knows about the user's Craft connection (from `/api/craft/status` and preview calls). */
+export type CraftUiStatus = {
+  /** Null until the status call answers or when the user has no connection. */
+  connectionId: string | null;
+  spaceId: string | null;
+  /** True when Craft rejected the key: the reconnect banner shows. */
+  unauthorized: boolean;
+};
+
 export type UiStore = {
   tool: Tool;
   editingNodeId: string | null;
@@ -23,7 +32,12 @@ export type UiStore = {
   helperLines: HelperLines;
   altHeld: boolean;
   colorPickerOpen: boolean;
+  craft: CraftUiStatus;
+  /** Craft document ids whose preview is being fetched (note cards shimmer). */
+  loadingPreviews: Record<string, true>;
 
+  setCraftStatus: (patch: Partial<CraftUiStatus>) => void;
+  setPreviewLoading: (docId: string, loading: boolean) => void;
   setTool: (tool: Tool) => void;
   setEditingNode: (id: string | null) => void;
   setEditingEdge: (id: string | null) => void;
@@ -49,7 +63,18 @@ export const useUiStore = create<UiStore>()((set) => ({
   helperLines: {},
   altHeld: false,
   colorPickerOpen: false,
+  craft: { connectionId: null, spaceId: null, unauthorized: false },
+  loadingPreviews: {},
 
+  setCraftStatus: (patch) => set((s) => ({ craft: { ...s.craft, ...patch } })),
+  setPreviewLoading: (docId, loading) =>
+    set((s) => {
+      if (Boolean(s.loadingPreviews[docId]) === loading) return s;
+      const next = { ...s.loadingPreviews };
+      if (loading) next[docId] = true;
+      else delete next[docId];
+      return { loadingPreviews: next };
+    }),
   setTool: (tool) => set({ tool }),
   setEditingNode: (editingNodeId) => set({ editingNodeId }),
   setEditingEdge: (editingEdgeId) => set({ editingEdgeId }),
@@ -65,5 +90,14 @@ export const useUiStore = create<UiStore>()((set) => ({
   setAltHeld: (altHeld) => set((s) => (s.altHeld === altHeld ? s : { altHeld })),
   setColorPickerOpen: (colorPickerOpen) => set({ colorPickerOpen }),
   resetTransient: () =>
-    set({ tool: "select", editingNodeId: null, editingEdgeId: null, contextMenu: null, helperLines: {}, altHeld: false, colorPickerOpen: false }),
+    set({
+      tool: "select",
+      editingNodeId: null,
+      editingEdgeId: null,
+      contextMenu: null,
+      helperLines: {},
+      altHeld: false,
+      colorPickerOpen: false,
+      loadingPreviews: {},
+    }),
 }));

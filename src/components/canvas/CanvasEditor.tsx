@@ -10,7 +10,9 @@ import { ReactFlowProvider } from "@xyflow/react";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 
 import { TopBar } from "@/components/app-shell/TopBar";
+import { ReconnectBanner } from "@/components/notes-panel/ReconnectBanner";
 import { useAutosave } from "@/hooks/useAutosave";
+import { useCraftStatus, useStalePreviewRefresh } from "@/hooks/useCraftPreviews";
 import type { CanvasDetail } from "@/lib/canvas/types";
 import { useCanvasStore } from "@/store/canvas-store";
 import { useUiStore } from "@/store/ui-store";
@@ -50,7 +52,10 @@ export function CanvasEditor({ canvas }: { canvas: CanvasDetail }) {
 
 function CanvasWorkspace({ canvasId }: { canvasId: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const unauthorized = useUiStore((s) => s.craft.unauthorized);
   useAutosave(canvasId);
+  useCraftStatus();
+  useStalePreviewRefresh(canvasId);
 
   return (
     <ReactFlowProvider>
@@ -58,6 +63,11 @@ function CanvasWorkspace({ canvasId }: { canvasId: string }) {
         <TopBar trailing={<SaveIndicator />}>
           <CanvasTitle canvasId={canvasId} />
         </TopBar>
+        {unauthorized ? (
+          <div className="border-b border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950" data-reconnect-banner>
+            <ReconnectBanner message="Your Craft connection stopped working. Note cards keep their last preview until you reconnect." />
+          </div>
+        ) : null}
         <div className="flex min-h-0 flex-1">
           <LeftPanel canvasId={canvasId} />
           <div className="relative min-w-0 flex-1">

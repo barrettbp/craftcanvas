@@ -2,7 +2,8 @@
  * GET /api/craft/status
  *   200 CraftStatusResponse = { connected, status: "ok" | "unauthorized" | "error" | null,
  *                               lastFullSync: string | null, label: string | null,
- *                               host: string | null, documentCount, syncing }
+ *                               host: string | null, documentCount, syncing,
+ *                               connectionId?, spaceId? }
  *   Works for users without a connection (`connected: false`). Never includes
  *   the key, cipher, IV or the full connection URL.
  */
@@ -36,6 +37,8 @@ export async function GET() {
         host: connection.host,
         documentCount,
         syncing: isRefreshInFlight(userId),
+        connectionId: connection.id,
+        spaceId: connection.spaceId,
       },
       { headers: { "Cache-Control": "no-store" } },
     );

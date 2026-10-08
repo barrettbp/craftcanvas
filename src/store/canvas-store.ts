@@ -844,6 +844,15 @@ export function selectDocIdsOnCanvas(state: Pick<CanvasStore, "nodes">): Set<str
   return ids;
 }
 
+/** How many cards on the canvas show `docId` (a cheap per node selector for the "2" badge). */
+export function selectDocCount(state: Pick<CanvasStore, "nodes">, docId: string): number {
+  let count = 0;
+  for (const n of state.nodes) {
+    if (n.type === "file" && (n.data as FileNodeData).craftcanvas.craftDocId === docId) count += 1;
+  }
+  return count;
+}
+
 /** Count of cards per Craft document id (for the "2" badge). */
 export function selectDocCounts(state: Pick<CanvasStore, "nodes">): Map<string, number> {
   const counts = new Map<string, number>();

@@ -275,6 +275,7 @@ export function NotesPanel({ docIdsOnCanvas, onAddDocument, searchInputRef }: No
           <Search className="pointer-events-none absolute top-1/2 left-2 h-4 w-4 -translate-y-1/2 text-zinc-400" aria-hidden="true" />
           <input
             ref={searchInputRef}
+            data-notes-search
             type="search"
             value={query}
             onChange={(e) => updateQuery(e.target.value)}

@@ -1,44 +1,49 @@
 "use client";
 
 /**
- * Left panel slot. WP3 replaces the body of this component with the real
- * `NotesPanel` from `@/components/notes-panel` and keeps the contract:
+ * Left panel slot: mounts the real `NotesPanel` (spec 8.6) and connects it to
+ * the canvas.
  *
  *   props: { canvasId: string }
- *   - Render the panel inside an element with `data-notes-panel`.
- *   - Render the search box as an `<input data-notes-search>` so Cmd/Ctrl K
- *     (and the "Note" toolbar button) can focus it via `focusNotesSearch()`.
- *   - Read `docIdsOnCanvas` with `selectDocIdsOnCanvas(useCanvasStore.getState())`
- *     and add cards with `useCanvasStore.getState().addFileNode(ext, position)`.
+ *   - The panel sits inside an element with `data-notes-panel`; the search box
+ *     is the `<input data-notes-search>` that `focusNotesSearch()` targets.
+ *   - `docIdsOnCanvas` comes from `selectDocIdsOnCanvas` so rows already placed
+ *     show their dot.
+ *   - The plus icon drops the card at the viewport centre; dragging a row onto
+ *     the pane is handled by `Canvas` (`onDrop`).
  */
-import { FileText } from "lucide-react";
-import Link from "next/link";
+import { useReactFlow, useStoreApi } from "@xyflow/react";
+import { useCallback, useMemo, useRef } from "react";
+
+import { NotesPanel, type NotesPanelDocument } from "@/components/notes-panel/NotesPanel";
+import { addCraftDocument } from "@/hooks/useCraftPreviews";
+import { cardOriginAt, rectCentre } from "@/lib/canvas/drop";
+import { DEFAULT_SIZES } from "@/lib/canvas/types";
+import { selectDocIdsOnCanvas, useCanvasStore } from "@/store/canvas-store";
 
 export type NotesPanelSlotProps = { canvasId: string };
 
 export function NotesPanelSlot({ canvasId }: NotesPanelSlotProps) {
+  const nodes = useCanvasStore((s) => s.nodes);
+  const docIdsOnCanvas = useMemo(() => selectDocIdsOnCanvas({ nodes }), [nodes]);
+  const rf = useReactFlow();
+  const flowStore = useStoreApi();
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const onAddDocument = useCallback(
+    (doc: NotesPanelDocument) => {
+      const pane = flowStore.getState().domNode;
+      const rect = pane?.getBoundingClientRect();
+      const centre = rect ? rectCentre(rect) : { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+      const point = rf.screenToFlowPosition(centre);
+      addCraftDocument(doc, cardOriginAt(point, DEFAULT_SIZES.file));
+    },
+    [rf, flowStore],
+  );
+
   return (
-    <div data-notes-panel data-canvas-id={canvasId} className="flex h-full flex-col">
-      <div className="border-b border-zinc-200 p-3 dark:border-zinc-800">
-        <input
-          data-notes-search
-          type="search"
-          placeholder="Search notes (⌘K)"
-          aria-label="Search notes"
-          className="w-full rounded-md border border-zinc-200 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-zinc-400 dark:border-zinc-700 dark:bg-zinc-900"
-        />
-      </div>
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-zinc-500">
-        <FileText className="h-6 w-6" aria-hidden />
-        <p>Notes panel coming.</p>
-        <p className="text-xs">
-          Your Craft documents will appear here once the connection is set up in{" "}
-          <Link href="/settings/craft" className="underline">
-            Settings › Craft
-          </Link>
-          .
-        </p>
-      </div>
+    <div data-notes-panel data-canvas-id={canvasId} className="flex h-full min-h-0 flex-col">
+      <NotesPanel docIdsOnCanvas={docIdsOnCanvas} onAddDocument={onAddDocument} searchInputRef={searchInputRef} />
     </div>
   );
 }
