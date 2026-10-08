@@ -37,7 +37,7 @@ describe("<DeleteAccountSection>", () => {
     fireEvent.click(screen.getByRole("button", { name: "Delete everything" }));
     await waitFor(() => expect(screen.getAllByRole("alert")[0]).toHaveTextContent("Could not delete your data."));
     expect(signOut).not.toHaveBeenCalled();
-    expect(screen.getByRole("button", { name: "Delete everything" })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Delete everything" })).toBeEnabled());
   });
 
   it("signs out to the landing page after a successful deletion", async () => {
