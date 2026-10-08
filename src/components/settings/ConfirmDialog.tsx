@@ -11,6 +11,8 @@ export type ConfirmDialogProps = {
   /** Visual style of the confirm button. */
   tone?: "default" | "danger";
   busy?: boolean;
+  /** Keeps the confirm button disabled, e.g. until a typed confirmation matches. */
+  confirmDisabled?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 };
@@ -27,6 +29,7 @@ export function ConfirmDialog({
   cancelLabel = "Cancel",
   tone = "default",
   busy = false,
+  confirmDisabled = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) {
@@ -41,7 +44,8 @@ export function ConfirmDialog({
       if (typeof el.showModal === "function") el.showModal();
       else el.setAttribute("open", "");
     } else if (!open && el.open) {
-      el.close();
+      if (typeof el.close === "function") el.close();
+      else el.removeAttribute("open");
     }
   }, [open]);
 
@@ -81,8 +85,8 @@ export function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={busy}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed ${confirmClass}`}
+            disabled={busy || confirmDisabled}
+            className={`rounded-md px-3 py-1.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60 ${confirmClass}`}
           >
             {busy ? "Working…" : confirmLabel}
           </button>

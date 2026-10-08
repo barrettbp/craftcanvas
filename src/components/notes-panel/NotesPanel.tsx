@@ -8,10 +8,12 @@
  * `docIdsOnCanvas` and receives new ones through `onAddDocument` or a drop of
  * the `application/x-craftcanvas-doc` payload.
  */
-import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, LoaderCircle, Plus, RefreshCw, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen, LoaderCircle, Plus, RefreshCw, Search, SearchX, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { EmptyState } from "@/components/ui/EmptyState";
+import { toastRateLimited } from "@/components/ui/toast";
 import { CRAFT_DOC_DRAG_TYPE, type CraftDocDragPayload, type CraftFolder, type CraftStatusResponse, type SearchResponse } from "@/lib/craft/types";
 
 import { ReconnectBanner } from "./ReconnectBanner";
@@ -44,7 +46,8 @@ async function apiGet<T>(url: string, signal?: AbortSignal): Promise<FetchOutcom
   try {
     const res = await fetch(url, { signal, cache: "no-store" });
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
+      const body = (await res.json().catch(() => null)) as { error?: string; retryAfter?: number } | null;
+      if (res.status === 429) toastRateLimited(body?.retryAfter ?? res.headers.get("Retry-After"));
       return { ok: false, status: res.status, error: body?.error ?? `http_${res.status}` };
     }
     return { ok: true, data: (await res.json()) as T };
@@ -556,10 +559,16 @@ function SearchResults({
   if (!results) return <Loading label="Searching…" />;
   if (results.documents.length === 0 && !searching) {
     return (
-      <PanelMessage>
-        No notes match &ldquo;{results.query}&rdquo;.
-        {results.craftError ? <p className="mt-1">Craft search was unavailable; only the local index was searched.</p> : null}
-      </PanelMessage>
+      <EmptyState
+        size="sm"
+        icon={<SearchX aria-hidden="true" />}
+        title={`No notes match “${results.query}”`}
+        description={
+          results.craftError
+            ? "Craft search was unavailable, so only the local index was searched. Try again in a moment."
+            : "Titles and previews are searched. Try a shorter word, or refresh notes if the document is new."
+        }
+      />
     );
   }
   return (

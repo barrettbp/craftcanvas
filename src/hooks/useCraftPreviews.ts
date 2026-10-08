@@ -17,6 +17,7 @@
  */
 import { useEffect } from "react";
 
+import { toastRateLimited } from "@/components/ui/toast";
 import type { FileNodeData } from "@/lib/canvas/convert";
 import { docToFileExtension } from "@/lib/canvas/drop";
 import { isStale, mergePreview, previewQueue } from "@/lib/craft/preview-client";
@@ -54,8 +55,11 @@ export async function refreshPreview(docId: string, options: { force?: boolean }
         if (data.craftcanvas.missing) continue;
         store.updateNodeData(node.id, { craftcanvas: { ...data.craftcanvas, missing: true } }, { history: false });
       }
+    } else if (outcome.status === 429) {
+      // The server already backed off and retried (spec section 7); tell the user once.
+      toastRateLimited(outcome.retryAfter);
     }
-    // not_connected, rate limits and network errors: keep the last preview quietly.
+    // not_connected and network errors: keep the last preview quietly.
   } finally {
     useUiStore.getState().setPreviewLoading(docId, false);
   }

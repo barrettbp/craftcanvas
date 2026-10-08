@@ -11,6 +11,7 @@ import { craftErrorResponse, currentUserId, json, unauthenticated } from "@/lib/
 import { findConnectionForUser } from "@/lib/craft/connection";
 import { CraftNotConnectedError } from "@/lib/craft/errors";
 import { isRefreshInFlight, isStale, startFullRefresh } from "@/lib/craft/indexer";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -23,9 +24,10 @@ export type RefreshResponse =
 export async function POST(req: Request) {
   const userId = await currentUserId();
   if (!userId) return unauthenticated();
+  const limited = rateLimited(userId, "craft"); if (limited) return limited;
 
   const url = new URL(req.url);
-  const ifStale = ["1", "true"].includes((url.searchParams.get("ifStale") ?? "").toLowerCase());
+  const ifStale =["1", "true"].includes((url.searchParams.get("ifStale") ?? "").toLowerCase());
 
   try {
     if (isRefreshInFlight(userId)) return json<RefreshResponse>({ started: false, alreadyRunning: true });

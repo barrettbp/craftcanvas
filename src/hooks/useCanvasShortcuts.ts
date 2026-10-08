@@ -7,6 +7,7 @@
 import { useReactFlow } from "@xyflow/react";
 import { useEffect, type RefObject } from "react";
 
+import { toggleKeyboardHelp } from "@/components/canvas/KeyboardHelp";
 import { useCanvasStore } from "@/store/canvas-store";
 import { useUiStore } from "@/store/ui-store";
 
@@ -101,6 +102,11 @@ export function useCanvasShortcuts(containerRef: RefObject<HTMLElement | null>) 
         return;
       }
       if (mod) return;
+      if (key === "?") {
+        e.preventDefault();
+        toggleKeyboardHelp();
+        return;
+      }
 
       switch (key) {
         case "Delete":

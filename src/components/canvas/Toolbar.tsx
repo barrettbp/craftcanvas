@@ -10,6 +10,7 @@ import {
   ArrowRight,
   BoxSelect,
   FileText,
+  Keyboard,
   Maximize2,
   Minus,
   Palette,
@@ -29,6 +30,7 @@ import { useCanvasStore } from "@/store/canvas-store";
 import { useUiStore } from "@/store/ui-store";
 
 import { ColorPicker } from "./ColorPicker";
+import { toggleKeyboardHelp } from "./KeyboardHelp";
 
 function ToolButton({
   label,
@@ -198,6 +200,9 @@ export function Toolbar({ containerRef }: { containerRef: React.RefObject<HTMLEl
         </ToolButton>
         <ToolButton label="Notes panel" shortcut="[" active={panelOpen} onClick={() => useUiStore.getState().togglePanel()}>
           <PanelLeft className="h-4 w-4" aria-hidden />
+        </ToolButton>
+        <ToolButton label="Keyboard shortcuts" shortcut="?" onClick={() => toggleKeyboardHelp()}>
+          <Keyboard className="h-4 w-4" aria-hidden />
         </ToolButton>
         <div className="relative">
           <ToolButton

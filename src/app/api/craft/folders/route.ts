@@ -5,6 +5,7 @@
 import { craftErrorResponse, currentUserId, json, unauthenticated } from "@/lib/craft/api";
 import { withCraft } from "@/lib/craft/connection";
 import type { CraftFolder } from "@/lib/craft/types";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const userId = await currentUserId();
   if (!userId) return unauthenticated();
+  const limited = rateLimited(userId, "craft"); if (limited) return limited;
 
   try {
     const folders = await withCraft(userId, ({ client }) => client.listFolders());

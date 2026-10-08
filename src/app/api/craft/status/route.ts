@@ -11,6 +11,7 @@ import { craftErrorResponse, currentUserId, json, unauthenticated } from "@/lib/
 import { findConnectionForUser } from "@/lib/craft/connection";
 import { countDocuments, isRefreshInFlight } from "@/lib/craft/indexer";
 import type { CraftStatusResponse } from "@/lib/craft/types";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -18,6 +19,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const userId = await currentUserId();
   if (!userId) return unauthenticated();
+  const limited = rateLimited(userId, "craft"); if (limited) return limited;
 
   try {
     const connection = await findConnectionForUser(userId);

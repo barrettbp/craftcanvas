@@ -26,6 +26,8 @@ export type PreviewOutcome =
       status: number;
       /** Error vocabulary from `@/lib/craft/api` ("craft_unauthorized", "not_connected", ...) or "network". */
       error: string;
+      /** Seconds to wait, when the route answered 429. */
+      retryAfter?: number;
     };
 
 /** True when `indexedAt` is missing, unparsable or at least 24 hours before `now`. */
@@ -60,8 +62,9 @@ export async function fetchPreview(docId: string, signal?: AbortSignal): Promise
   try {
     const res = await fetch(`/api/craft/preview/${encodeURIComponent(docId)}`, { signal, cache: "no-store" });
     if (!res.ok) {
-      const body = (await res.json().catch(() => null)) as { error?: string } | null;
-      return { ok: false, status: res.status, error: body?.error ?? `http_${res.status}` };
+      const body = (await res.json().catch(() => null)) as { error?: string; retryAfter?: number } | null;
+      const retryAfter = body?.retryAfter ?? (Number(res.headers.get("Retry-After")) || undefined);
+      return { ok: false, status: res.status, error: body?.error ?? `http_${res.status}`, ...(retryAfter ? { retryAfter } : {}) };
     }
     return { ok: true, data: (await res.json()) as PreviewResponse };
   } catch (err) {

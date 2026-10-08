@@ -13,6 +13,8 @@ import { craftErrorResponse, currentUserId, json, unauthenticated } from "@/lib/
 import { getConnectionForUser, runWithConnection } from "@/lib/craft/connection";
 import { CraftNetworkError, CraftServerError, CraftTimeoutError, CraftUnauthorizedError } from "@/lib/craft/errors";
 import { upsertDocuments } from "@/lib/craft/indexer";
+import { log } from "@/lib/log";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +34,7 @@ export type DocumentsResponse = { location: string | null; source: "craft" | "lo
 export async function GET(req: Request) {
   const userId = await currentUserId();
   if (!userId) return unauthenticated();
+  const limited = rateLimited(userId, "craft"); if (limited) return limited;
 
   const url = new URL(req.url);
   const location = (url.searchParams.get("location") ?? "").trim().slice(0, 200) || null;
@@ -67,7 +70,7 @@ export async function GET(req: Request) {
         missing: false,
       })),
     ).catch((err: unknown) => {
-      console.warn("[api/craft/documents] index update failed", err instanceof Error ? err.message : err);
+      log.warn("api/craft/documents index update failed", { err });
     });
 
     return json<DocumentsResponse>({

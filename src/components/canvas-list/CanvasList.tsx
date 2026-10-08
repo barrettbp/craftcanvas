@@ -5,11 +5,12 @@
  * updated time; new canvas, inline rename, duplicate, delete with confirm,
  * sorted by last updated, client side search by title, empty states.
  */
-import { Plus, Search } from "lucide-react";
+import { LayoutGrid, Plus, Search, SearchX } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
+import { EmptyState } from "@/components/ui/EmptyState";
 import { createCanvas, deleteCanvas, duplicateCanvas, renameCanvas } from "@/lib/canvas/client";
 import type { CanvasSummary } from "@/lib/canvas/types";
 
@@ -115,11 +116,11 @@ export function CanvasList({ initial, hasCraftConnection }: { initial: CanvasSum
 
       {!hasCraftConnection ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          Craft is not connected yet. Text cards and groups work now; to pull in your notes,{" "}
+          Craft is not connected yet. Text cards, groups and arrows work right away. To drag your notes onto a canvas,{" "}
           <Link href="/settings/craft" className="font-medium underline">
             connect Craft in settings
-          </Link>
-          .
+          </Link>{" "}
+          (it takes about a minute).
         </div>
       ) : null}
 
@@ -130,23 +131,35 @@ export function CanvasList({ initial, hasCraftConnection }: { initial: CanvasSum
       ) : null}
 
       {items.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-zinc-300 px-6 py-16 text-center dark:border-zinc-700">
-          <p className="text-lg font-medium">No canvases yet</p>
-          <p className="max-w-md text-sm text-zinc-500">
-            A canvas is a board for your Craft notes: drop documents on it, connect them with arrows and add text and groups.
-          </p>
-          <button
-            type="button"
-            onClick={() => void onNew()}
-            disabled={creating}
-            className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-md bg-zinc-900 px-3 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900"
-          >
-            <Plus className="h-4 w-4" aria-hidden />
-            Create your first canvas
-          </button>
-        </div>
+        <EmptyState
+          outlined
+          icon={<LayoutGrid aria-hidden />}
+          title="No canvases yet"
+          description="A canvas is a board for your Craft notes: drop documents on it, connect them with arrows and add text cards and groups."
+          action={
+            <button
+              type="button"
+              onClick={() => void onNew()}
+              disabled={creating}
+              className="inline-flex h-9 items-center gap-1.5 rounded-md bg-zinc-900 px-3 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-60 dark:bg-zinc-50 dark:text-zinc-900"
+            >
+              <Plus className="h-4 w-4" aria-hidden />
+              Create your first canvas
+            </button>
+          }
+        />
       ) : visible.length === 0 ? (
-        <p className="py-10 text-center text-sm text-zinc-500">No canvases match “{query.trim()}”.</p>
+        <EmptyState
+          size="sm"
+          icon={<SearchX aria-hidden />}
+          title={`No canvases match “${query.trim()}”`}
+          description="Titles are searched. Clear the search to see every canvas."
+          action={
+            <button type="button" onClick={() => setQuery("")} className="text-xs font-medium underline underline-offset-2">
+              Clear search
+            </button>
+          }
+        />
       ) : (
         <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {visible.map((canvas) => (

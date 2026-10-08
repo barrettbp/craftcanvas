@@ -27,6 +27,9 @@ export function TopBar({ children, trailing }: TopBarProps) {
         <Link href="/settings" className="hover:text-zinc-900 dark:hover:text-zinc-100">
           Settings
         </Link>
+        <Link href="/privacy" className="hidden hover:text-zinc-900 sm:inline dark:hover:text-zinc-100">
+          Privacy
+        </Link>
       </nav>
       {trailing}
       <UserButton />

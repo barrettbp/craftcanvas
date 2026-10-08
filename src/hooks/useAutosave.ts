@@ -8,24 +8,42 @@
  */
 import { useEffect } from "react";
 
+import { toast, toastRateLimited } from "@/components/ui/toast";
 import { createAutosaveController } from "@/lib/canvas/autosave";
 import { useCanvasStore } from "@/store/canvas-store";
+
+/** Plain fetch that also raises the "rate limited" toast on a 429 (spec section 7). */
+async function fetchWithRateLimitToast(input: string, init?: RequestInit): Promise<Response> {
+  const res = await fetch(input, init);
+  if (res.status === 429) toastRateLimited(res.headers.get("Retry-After"));
+  return res;
+}
 
 export function useAutosave(canvasId: string) {
   useEffect(() => {
     const store = useCanvasStore;
-    const controller = createAutosaveController(canvasId, {
-      snapshot: () => {
-        const s = store.getState();
-        return { data: s.getCanvasData(), version: s.version, seq: s.changeSeq };
+    const controller = createAutosaveController(
+      canvasId,
+      {
+        snapshot: () => {
+          const s = store.getState();
+          return { data: s.getCanvasData(), version: s.version, seq: s.changeSeq };
+        },
+        isDirty: () => store.getState().dirty && store.getState().canvasId === canvasId,
+        setSaveState: (state) => store.getState().setSaveState(state),
+        onSaved: (version, seq) => store.getState().markSaved(version, seq),
+        onConflict: (fresh) => {
+          if (fresh && store.getState().canvasId === canvasId) store.getState().replaceFromServer(fresh);
+          toast({
+            id: "canvas-conflict",
+            tone: "warning",
+            title: "Updated in another tab",
+            description: fresh ? "This canvas was reloaded with the latest version." : "Reload the page to get the latest version.",
+          });
+        },
       },
-      isDirty: () => store.getState().dirty && store.getState().canvasId === canvasId,
-      setSaveState: (state) => store.getState().setSaveState(state),
-      onSaved: (version, seq) => store.getState().markSaved(version, seq),
-      onConflict: (fresh) => {
-        if (fresh && store.getState().canvasId === canvasId) store.getState().replaceFromServer(fresh);
-      },
-    });
+      { fetchImpl: fetchWithRateLimitToast },
+    );
 
     const unsubscribe = store.subscribe((state, prev) => {
       if (state.canvasId !== canvasId) return;

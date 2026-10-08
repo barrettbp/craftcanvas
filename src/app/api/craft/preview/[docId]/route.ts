@@ -9,6 +9,7 @@
 import { craftErrorResponse, currentUserId, errorResponse, json, unauthenticated } from "@/lib/craft/api";
 import { refreshDocument } from "@/lib/craft/indexer";
 import type { PreviewResponse } from "@/lib/craft/types";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ export const dynamic = "force-dynamic";
 export async function GET(_req: Request, ctx: { params: Promise<{ docId: string }> }) {
   const userId = await currentUserId();
   if (!userId) return unauthenticated();
+  const limited = rateLimited(userId, "craft"); if (limited) return limited;
 
   const { docId } = await ctx.params;
   const id = decodeURIComponent(docId ?? "").trim();

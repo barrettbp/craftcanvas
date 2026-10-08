@@ -32,6 +32,12 @@ export default async function LandingPage() {
           .
         </p>
       </div>
+      <footer className="mt-16 flex items-center gap-4 text-xs text-zinc-500">
+        <span>CraftCanvas</span>
+        <Link href="/privacy" className="hover:text-zinc-900 hover:underline dark:hover:text-zinc-100">
+          Privacy
+        </Link>
+      </footer>
     </main>
   );
 }

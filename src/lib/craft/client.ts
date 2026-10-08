@@ -9,6 +9,8 @@
  * - Logs method, path and latency. The key never appears in logs or errors.
  * - Response parsing is delegated to `normalise.ts`.
  */
+import { log, redactString } from "@/lib/log";
+
 import {
   CraftError,
   CraftNetworkError,
@@ -66,14 +68,10 @@ export const DEFAULT_MAX_RETRIES = 3;
 export const DEFAULT_BACKOFF_BASE_MS = 300;
 const MAX_RETRY_AFTER_MS = 10_000;
 
+/** One structured line per attempt; `@/lib/log` redacts any `pdk_` token that slips into a field. */
 const defaultLogger: CraftLogger = (entry) => {
-  const parts = [`[craft] ${entry.method} ${entry.path}`, `attempt=${entry.attempt}`, `${entry.latencyMs}ms`];
-  if (entry.status !== undefined) parts.push(`status=${entry.status}`);
-  parts.push(entry.outcome);
-  if (entry.error) parts.push(entry.error);
-  const line = parts.join(" ");
-  if (entry.outcome === "error") console.warn(line);
-  else console.info(line);
+  if (entry.outcome === "error") log.warn("craft.request", { ...entry });
+  else log.info("craft.request", { ...entry });
 };
 
 /** Strips trailing slashes so paths can be appended. */
@@ -111,7 +109,7 @@ function errorForStatus(status: number, retryAfterMs?: number): CraftError {
 
 /** Guards against a key leaking through an error message (e.g. a URL echoed by undici). */
 export function redactKey(text: string): string {
-  return text.replace(/pdk_[A-Za-z0-9_-]+/g, "pdk_[redacted]");
+  return redactString(text);
 }
 
 function safeMessage(err: unknown): string {

@@ -20,6 +20,7 @@ import type { ZodError } from "zod";
 
 import { DecryptError } from "@/lib/crypto/aes";
 import { MissingEnvError } from "@/lib/env";
+import { log } from "@/lib/log";
 
 import {
   CraftError,
@@ -76,9 +77,9 @@ export function craftErrorResponse(err: unknown, context = "api/craft"): NextRes
   }
   if (err instanceof CraftError) return errorResponse(502, "craft_error", { message: err.message });
   if (err instanceof DecryptError || err instanceof MissingEnvError) {
-    console.error(`[${context}] configuration error:`, err.name);
+    log.error("configuration error", { context, error: err.name });
     return errorResponse(500, "server_misconfigured");
   }
-  console.error(`[${context}] unexpected error:`, err instanceof Error ? `${err.name}: ${err.message}` : err);
+  log.error("unexpected error", { context, err });
   return errorResponse(500, "internal_error");
 }

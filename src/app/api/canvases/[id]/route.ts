@@ -11,6 +11,7 @@ import {
   toSummary,
 } from "@/lib/canvas/api";
 import { deleteCanvasForUser, getCanvasForUser, renameCanvasForUser, saveCanvasIfVersion } from "@/lib/canvas/repo";
+import { rateLimited } from "@/lib/rate-limit";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -18,6 +19,7 @@ type Context = { params: Promise<{ id: string }> };
 export async function GET(_req: Request, { params }: Context) {
   const { userId } = await auth();
   if (!userId) return jsonError(401, "unauthorized");
+  const limited = rateLimited(userId, "canvases"); if (limited) return limited;
   const { id } = await params;
   if (!isCanvasId(id)) return jsonError(404, "not_found");
   const row = await getCanvasForUser(userId, id);
@@ -33,6 +35,7 @@ export async function GET(_req: Request, { params }: Context) {
 export async function PUT(req: Request, { params }: Context) {
   const { userId } = await auth();
   if (!userId) return jsonError(401, "unauthorized");
+  const limited = rateLimited(userId, "canvases"); if (limited) return limited;
   const { id } = await params;
   if (!isCanvasId(id)) return jsonError(404, "not_found");
   const parsed = saveCanvasBodySchema.safeParse(await readJson(req));
@@ -54,6 +57,7 @@ export async function PUT(req: Request, { params }: Context) {
 export async function PATCH(req: Request, { params }: Context) {
   const { userId } = await auth();
   if (!userId) return jsonError(401, "unauthorized");
+  const limited = rateLimited(userId, "canvases"); if (limited) return limited;
   const { id } = await params;
   if (!isCanvasId(id)) return jsonError(404, "not_found");
   const parsed = renameCanvasBodySchema.safeParse(await readJson(req));
@@ -67,6 +71,7 @@ export async function PATCH(req: Request, { params }: Context) {
 export async function DELETE(_req: Request, { params }: Context) {
   const { userId } = await auth();
   if (!userId) return jsonError(401, "unauthorized");
+  const limited = rateLimited(userId, "canvases"); if (limited) return limited;
   const { id } = await params;
   if (!isCanvasId(id)) return jsonError(404, "not_found");
   const deleted = await deleteCanvasForUser(userId, id);

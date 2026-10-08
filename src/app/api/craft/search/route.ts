@@ -13,6 +13,7 @@ import { getConnectionForUser, runWithConnection } from "@/lib/craft/connection"
 import { CraftUnauthorizedError } from "@/lib/craft/errors";
 import { escapeLike, mergeSearchResults, normaliseQuery } from "@/lib/craft/search";
 import type { SearchResponse, SearchResult } from "@/lib/craft/types";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ const LOCAL_LIMIT = 50;
 export async function GET(req: Request) {
   const userId = await currentUserId();
   if (!userId) return unauthenticated();
+  const limited = rateLimited(userId, "craft"); if (limited) return limited;
 
   const url = new URL(req.url);
   const query = normaliseQuery(url.searchParams.get("q"));

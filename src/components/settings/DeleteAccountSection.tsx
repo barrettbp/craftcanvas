@@ -1,26 +1,55 @@
 "use client";
 
+import { useClerk } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { deleteAccount } from "@/app/settings/actions";
+import { deleteAccount, type DeleteAccountResult } from "@/app/settings/actions";
 
 import { ConfirmDialog } from "./ConfirmDialog";
 
 const CONFIRM_WORD = "DELETE";
 
+/**
+ * Account deletion (spec M5): confirm dialog with a typed word, the server
+ * action wipes our data and the Clerk user, then the client signs out and
+ * lands on `/`. Errors from the action are shown inline so the user can retry.
+ */
 export function DeleteAccountSection() {
+  const { signOut } = useClerk();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
   const [pending, startTransition] = useTransition();
 
   function confirm() {
     if (typed !== CONFIRM_WORD) return;
     setError(null);
     startTransition(async () => {
-      const result = await deleteAccount();
-      // On success the action redirects and never resolves here.
-      if (result && !result.ok) setError(result.error);
+      let result: DeleteAccountResult;
+      try {
+        result = await deleteAccount();
+      } catch (err) {
+        // A redirect thrown by the action (signed out) must keep propagating.
+        if (typeof err === "object" && err !== null && "digest" in err && String((err as { digest: unknown }).digest).startsWith("NEXT_")) throw err;
+        setError("Could not delete your account. Please check your connection and try again.");
+        return;
+      }
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setDone(true);
+      setOpen(false);
+      try {
+        await signOut({ redirectUrl: "/" });
+      } catch {
+        // The session is already gone on Clerk's side; leave the settings page anyway.
+        router.push("/");
+        router.refresh();
+      }
     });
   }
 
@@ -38,11 +67,16 @@ export function DeleteAccountSection() {
           setError(null);
           setOpen(true);
         }}
-        className="mt-4 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700"
+        disabled={done}
+        className="mt-4 rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:opacity-60"
       >
-        Delete account
+        {done ? "Account deleted, signing out…" : "Delete account"}
       </button>
-      {error ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-400">
+          {error}
+        </p>
+      ) : null}
 
       <ConfirmDialog
         open={open}
@@ -50,6 +84,7 @@ export function DeleteAccountSection() {
         confirmLabel="Delete everything"
         tone="danger"
         busy={pending}
+        confirmDisabled={typed !== CONFIRM_WORD}
         onConfirm={confirm}
         onCancel={() => setOpen(false)}
       >
@@ -59,12 +94,21 @@ export function DeleteAccountSection() {
           <input
             value={typed}
             onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && typed === CONFIRM_WORD && !pending) confirm();
+            }}
             autoComplete="off"
             spellCheck={false}
+            aria-label={`Type ${CONFIRM_WORD} to confirm`}
             className="mt-1 w-full rounded-md border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-950 dark:text-zinc-100"
           />
         </label>
         {typed.length > 0 && typed !== CONFIRM_WORD ? <p className="mt-1 text-xs text-zinc-500">Type {CONFIRM_WORD} exactly.</p> : null}
+        {error ? (
+          <p role="alert" className="mt-3 text-sm text-red-600 dark:text-red-400">
+            {error}
+          </p>
+        ) : null}
       </ConfirmDialog>
     </div>
   );

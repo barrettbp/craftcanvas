@@ -76,6 +76,25 @@ read lazily by `src/lib/env.ts`, so missing values only fail at the moment they 
 4. For thumbnails, create a public Storage bucket (default name `thumbnails`) and set the three
    `SUPABASE_*` variables. Without them thumbnails are stored as data URLs in the database.
 
+## Database
+
+Migrations live in `drizzle/` and are applied with `pnpm db:migrate` (`drizzle-kit migrate`, which
+reads `drizzle/meta/_journal.json`). Schema changes are generated from `src/db/schema.ts` with
+`pnpm db:generate`; `0001_rls.sql` was written by hand because it changes policies, not columns.
+
+- `0000_strong_imperial_guard.sql`: the four tables from spec section 9.
+- `0001_rls.sql`: enables **row level security** on `users`, `craft_connections`, `craft_documents`
+  and `canvases` with policies that compare the row's owner against the JWT `sub` claim
+  (`coalesce(current_setting('request.jwt.claims', true)::json->>'sub', '')`; `craft_documents`
+  joins through its connection). The app itself connects with the **service role / table owner,
+  which bypasses RLS**, and every query already filters by `user_id`; RLS is a second layer so any
+  other client with a user JWT (PostgREST, dashboards, future edge functions) can only reach its
+  own rows. Tables are not `FORCE`d, so the owner keeps full access for the app and for migrations.
+
+Our own API routes are also rate limited per user (`src/lib/rate-limit`, 120/min for
+`/api/canvases/*`, 60/min for `/api/craft/*`, in memory and therefore per instance in v1); over the
+limit they answer `429` with `Retry-After` and `{ "error": "rate_limited", "retryAfter" }`.
+
 ## Set up Craft
 
 CraftCanvas talks to Craft through a per-user **API connection** that the user creates inside Craft:

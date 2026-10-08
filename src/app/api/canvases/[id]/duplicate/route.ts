@@ -2,6 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 
 import { coerceData, copyTitle, isCanvasId, jsonError, toSummary } from "@/lib/canvas/api";
 import { createCanvasForUser, getCanvasForUser, listCanvasesForUser } from "@/lib/canvas/repo";
+import { rateLimited } from "@/lib/rate-limit";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -9,6 +10,7 @@ type Context = { params: Promise<{ id: string }> };
 export async function POST(_req: Request, { params }: Context) {
   const { userId } = await auth();
   if (!userId) return jsonError(401, "unauthorized");
+  const limited = rateLimited(userId, "canvases"); if (limited) return limited;
   const { id } = await params;
   if (!isCanvasId(id)) return jsonError(404, "not_found");
   const source = await getCanvasForUser(userId, id);

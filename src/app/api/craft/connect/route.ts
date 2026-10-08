@@ -20,6 +20,8 @@ import { createCraftClient, normaliseBaseUrl } from "@/lib/craft/client";
 import { hostOf } from "@/lib/craft/connection";
 import { startFullRefresh } from "@/lib/craft/indexer";
 import { encrypt } from "@/lib/crypto/aes";
+import { log } from "@/lib/log";
+import { rateLimited } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -55,6 +57,7 @@ const bodySchema = z.object({
 export async function POST(req: Request) {
   const userId = await currentUserId();
   if (!userId) return unauthenticated();
+  const limited = rateLimited(userId, "craft"); if (limited) return limited;
 
   let raw: unknown;
   try {
@@ -135,7 +138,7 @@ export async function POST(req: Request) {
 
     // 3. Kick off the initial index without waiting for it.
     startFullRefresh(userId, { force: true }).catch((err: unknown) => {
-      console.error("[api/craft/connect] could not start initial index", err instanceof Error ? `${err.name}: ${err.message}` : err);
+      log.error("api/craft/connect could not start initial index", { err });
     });
 
     return json({
@@ -154,6 +157,7 @@ export async function POST(req: Request) {
 export async function DELETE() {
   const userId = await currentUserId();
   if (!userId) return unauthenticated();
+  const limited = rateLimited(userId, "craft"); if (limited) return limited;
 
   try {
     // Documents cascade from the connection, but delete explicitly so the wipe

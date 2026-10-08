@@ -13,12 +13,16 @@ import { TopBar } from "@/components/app-shell/TopBar";
 import { ReconnectBanner } from "@/components/notes-panel/ReconnectBanner";
 import { useAutosave } from "@/hooks/useAutosave";
 import { useCraftStatus, useStalePreviewRefresh } from "@/hooks/useCraftPreviews";
+import { useThumbnail } from "@/hooks/useThumbnail";
 import type { CanvasDetail } from "@/lib/canvas/types";
 import { useCanvasStore } from "@/store/canvas-store";
 import { useUiStore } from "@/store/ui-store";
 
 import { Canvas } from "./Canvas";
 import { CanvasTitle } from "./CanvasTitle";
+import { EmptyCanvasHint } from "./EmptyCanvasHint";
+import { ExportMenu } from "./export/ExportMenu";
+import { KeyboardHelp } from "./KeyboardHelp";
 import { LeftPanel } from "./LeftPanel";
 import { SaveIndicator } from "./SaveIndicator";
 import { Toolbar } from "./Toolbar";
@@ -54,6 +58,7 @@ function CanvasWorkspace({ canvasId }: { canvasId: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const unauthorized = useUiStore((s) => s.craft.unauthorized);
   useAutosave(canvasId);
+  useThumbnail(canvasId, containerRef);
   useCraftStatus();
   useStalePreviewRefresh(canvasId);
 
@@ -62,6 +67,7 @@ function CanvasWorkspace({ canvasId }: { canvasId: string }) {
       <div className="flex h-dvh flex-col overflow-hidden">
         <TopBar trailing={<SaveIndicator />}>
           <CanvasTitle canvasId={canvasId} />
+          <ExportMenu canvasId={canvasId} />
         </TopBar>
         {unauthorized ? (
           <div className="border-b border-zinc-200 bg-white px-3 py-2 dark:border-zinc-800 dark:bg-zinc-950" data-reconnect-banner>
@@ -72,7 +78,9 @@ function CanvasWorkspace({ canvasId }: { canvasId: string }) {
           <LeftPanel canvasId={canvasId} />
           <div className="relative min-w-0 flex-1">
             <Canvas containerRef={containerRef} />
+            <EmptyCanvasHint />
             <Toolbar containerRef={containerRef} />
+            <KeyboardHelp />
           </div>
         </div>
       </div>
