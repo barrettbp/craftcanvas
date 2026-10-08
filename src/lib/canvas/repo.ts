@@ -77,6 +77,20 @@ export async function deleteCanvasForUser(userId: string, id: string): Promise<b
   return rows.length > 0;
 }
 
+/**
+ * Stores the thumbnail (storage URL or data URL) without bumping `version` or
+ * `updatedAt`: a snapshot is not an edit. Returns `null` when the canvas is
+ * missing or owned by someone else.
+ */
+export async function setCanvasThumbnailForUser(userId: string, id: string, thumbnail: string): Promise<CanvasRow | null> {
+  const rows = await getDb()
+    .update(canvases)
+    .set({ thumbnail })
+    .where(and(eq(canvases.id, id), eq(canvases.userId, userId)))
+    .returning();
+  return rows[0] ?? null;
+}
+
 export async function userHasCraftConnection(userId: string): Promise<boolean> {
   const rows = await getDb()
     .select({ id: craftConnections.id })
