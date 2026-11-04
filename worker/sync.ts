@@ -9,13 +9,25 @@ import type { Bindings } from "./env";
 import type { DocRef } from "./craft/parse";
 import { cleanMarkdown, deepLinks, extractLinks, makePreview, titleFromMarkdown } from "./craft/parse";
 import type { NoteSource } from "./craft/source";
+import { CraftApiError } from "./craft/client";
 import { nowIso } from "./util";
 import type { SyncResult, SyncStatus } from "../shared/types";
 
 const BATCH = 8;
 const RUNNING_STALE_MS = 3 * 60_000;
 
-type Pending = { spaceId: string | null; docs: DocRef[]; meta: Record<string, Record<string, unknown>>; startedAt: string; seen: string[] };
+type Pending = {
+  spaceId: string | null;
+  docs: DocRef[];
+  meta: Record<string, Record<string, unknown>>;
+  startedAt: string;
+  seen: string[];
+  /** Index of the next document to fetch. The posted cursor must match it. */
+  next: number;
+  /** True when enumeration could not list every folder; unseen notes are then NOT marked deleted. */
+  partial: boolean;
+  skipped: string[];
+};
 
 async function getState(db: D1Database, key: string): Promise<string | null> {
   const row = await db.prepare("SELECT value FROM sync_state WHERE key = ?").bind(key).first<{ value: string }>();
@@ -52,7 +64,7 @@ export async function runSyncStep(env: Bindings, source: NoteSource, cursor: str
 
   if (cursor === null) {
     const e = await source.enumerate();
-    pending = { spaceId: e.spaceId, docs: e.docs, meta: e.meta, startedAt: nowIso(), seen: [] };
+    pending = { spaceId: e.spaceId, docs: e.docs, meta: e.meta, startedAt: nowIso(), seen: [], next: 0, partial: e.partial, skipped: [] };
     index = 0;
     await setState(db, "pending", JSON.stringify(pending));
     await setState(db, "running_since", pending.startedAt);
@@ -64,15 +76,29 @@ export async function runSyncStep(env: Bindings, source: NoteSource, cursor: str
       throw new SyncError("bad_cursor", "No sync in progress for this cursor. Start again with cursor null.");
     }
     pending = JSON.parse(raw) as Pending;
+    if (index !== pending.next) {
+      throw new SyncError("bad_cursor", `Expected cursor ${pending.next}, got ${index}. Continue with the cursor from the last response or start again with cursor null.`);
+    }
     await setState(db, "running_since", nowIso());
   }
 
   const slice = pending.docs.slice(index, index + BATCH);
   const stmts: D1PreparedStatement[] = [];
   const syncedAt = nowIso();
+  let importedNow = 0;
 
   for (const ref of slice) {
-    const doc = await source.fetchDocument(ref, pending.meta[ref.id]);
+    let doc;
+    try {
+      doc = await source.fetchDocument(ref, pending.meta[ref.id]);
+    } catch (e) {
+      // A document removed or unshared between enumeration and fetch must not block the whole sync.
+      if (e instanceof CraftApiError && (e.status === 403 || e.status === 404 || e.status === 410)) {
+        pending.skipped.push(ref.id);
+        continue;
+      }
+      throw e;
+    }
     const title = doc.title || titleFromMarkdown(doc.markdown) || "Untitled";
     const markdown = cleanMarkdown(doc.markdown);
     const preview = makePreview(doc.markdown);
@@ -103,6 +129,7 @@ export async function runSyncStep(env: Bindings, source: NoteSource, cursor: str
       stmts.push(db.prepare("INSERT OR REPLACE INTO note_blocks (block_id, note_id) VALUES (?, ?)").bind(b, doc.id));
     }
     pending.seen.push(doc.id);
+    importedNow += 1;
   }
 
   // D1 batch is transactional; chunk to stay well under statement limits.
@@ -110,11 +137,13 @@ export async function runSyncStep(env: Bindings, source: NoteSource, cursor: str
 
   const next = index + slice.length;
   const done = next >= pending.docs.length;
+  pending.next = next;
 
   if (done) {
     // Resolve links to notes (direct id match or via a sub-block id), mark unseen notes as deleted, finish.
+    // When enumeration was partial we cannot tell "gone" from "not listed", so nothing is marked deleted.
     const seen = new Set(pending.seen);
-    const existing = await db.prepare("SELECT id FROM notes WHERE deleted = 0").all<{ id: string }>();
+    const existing = pending.partial ? { results: [] as { id: string }[] } : await db.prepare("SELECT id FROM notes WHERE deleted = 0").all<{ id: string }>();
     const gone = (existing.results ?? []).map((r) => r.id).filter((id) => !seen.has(id));
     const finish: D1PreparedStatement[] = [
       db.prepare(
@@ -131,7 +160,7 @@ export async function runSyncStep(env: Bindings, source: NoteSource, cursor: str
     await setState(db, "pending", JSON.stringify(pending));
   }
 
-  return { done, cursor: done ? null : String(next), imported: slice.length, total: pending.docs.length, mode: source.mode };
+  return { done, cursor: done ? null : String(next), imported: importedNow, total: pending.docs.length, mode: source.mode, skipped: pending.skipped.length, partial: pending.partial };
 }
 
 export class SyncError extends Error {

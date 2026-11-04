@@ -149,6 +149,9 @@ boards.put("/boards/:id/cards", async (c) => {
   const items = Array.isArray(body.cards) ? (body.cards as Record<string, unknown>[]) : null;
   if (!items) return bad(c, "cards[] is required");
   if (items.length > 500) return bad(c, "at most 500 cards per request");
+  // A stale sectionId (section deleted while a debounced update was in flight) must not fail the batch.
+  const sectionRows = await c.env.DB.prepare("SELECT id FROM sections WHERE board_id = ?").bind(boardId).all<{ id: string }>();
+  const validSections = new Set((sectionRows.results ?? []).map((r) => r.id));
   const stmts: D1PreparedStatement[] = [];
   for (const it of items) {
     if (typeof it.id !== "string") continue;
@@ -166,7 +169,7 @@ boards.put("/boards/:id/cards", async (c) => {
     }
     if (it.sectionId === null || typeof it.sectionId === "string") {
       sets.push("section_id = ?");
-      binds.push(it.sectionId);
+      binds.push(typeof it.sectionId === "string" && validSections.has(it.sectionId) ? it.sectionId : null);
     }
     if (it.color === null || typeof it.color === "string") {
       sets.push("color = ?");

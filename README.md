@@ -69,5 +69,5 @@ npx wrangler secret put CRAFT_CONNECTION_URL
 ## Secrets and privacy
 
 - The Craft connection URL and key are Worker secrets. They never reach the browser, the repo, or logs; error messages strip URLs.
-- Sessions are HMAC-signed cookies (`HttpOnly`, `Secure`, `SameSite=Lax`, 14 days). Login is throttled to 5 attempts per minute per IP.
+- Sessions are HMAC-signed cookies (`HttpOnly`, `Secure`, `SameSite=Lax`, 14 days). Logout clears the cookie; to revoke every session, rotate `SESSION_SECRET`. Login is throttled to 5 attempts per minute per IP per isolate, so keep `APP_PASSWORD` long and random.
 - The Worker only ever sends GET requests to Craft, paced at one request per 700 ms with `Retry-After` backoff.

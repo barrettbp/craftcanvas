@@ -9,6 +9,12 @@ import loginHtml from "./login.html?raw";
 
 const app = new Hono<AppEnv>();
 
+// Unexpected errors become JSON and never echo URLs (the Craft connection URL is a credential).
+app.onError((err, c) => {
+  const message = (err instanceof Error ? err.message : "error").replace(/https?:\/\/\S+/g, "[url]").slice(0, 300);
+  return c.json({ error: "internal", message }, 500);
+});
+
 // Private tool: never indexed, never cached by intermediaries.
 app.use("*", async (c, next) => {
   await next();

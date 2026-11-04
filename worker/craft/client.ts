@@ -67,7 +67,7 @@ export class CraftClient {
         }
         const ra = res.headers.get("retry-after");
         const raMs = ra ? (Number.isFinite(Number(ra)) ? Number(ra) * 1000 : Math.max(0, Date.parse(ra) - Date.now())) : NaN;
-        const backoff = Number.isFinite(raMs) ? raMs : Math.min(30_000, 1000 * 2 ** attempt) + Math.random() * 500;
+        const backoff = Number.isFinite(raMs) ? Math.min(raMs, 60_000) : Math.min(30_000, 1000 * 2 ** attempt) + Math.random() * 500;
         await res.body?.cancel();
         await sleep(backoff);
         continue;
@@ -138,7 +138,12 @@ export class CraftClient {
       blockIds = Array.from(new Set([ref.id, ...walked.blockIds]));
       if (walked.title) title = walked.title;
     } catch (e) {
-      if (!(e instanceof CraftApiError) || e.status === 429) throw e;
+      // A non-JSON 200 body (SyntaxError) or a non-429 HTTP error falls through to the markdown request.
+      if (e instanceof CraftApiError && e.status !== 429) {
+        /* fall through */
+      } else if (!(e instanceof SyntaxError)) {
+        throw e;
+      }
     }
 
     if (!markdown.trim()) {

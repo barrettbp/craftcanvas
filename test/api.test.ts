@@ -267,3 +267,38 @@ describe("boards, cards, sections, connections", () => {
     expect(onBoards.items).toEqual([]);
   });
 });
+
+describe("review fixes", () => {
+  beforeAll(login);
+
+  it("rejects a cursor that does not match the sync in progress and never marks notes deleted for it", async () => {
+    const first = (await (await req("/api/sync", { method: "POST", body: JSON.stringify({ cursor: null }) })).json()) as SyncResult;
+    expect(first.done).toBe(false);
+    const stale = await req("/api/sync", { method: "POST", body: JSON.stringify({ cursor: "999" }) });
+    expect(stale.status).toBe(400);
+    const s = (await (await req("/api/sync/status")).json()) as SyncStatus;
+    expect(s.noteCount).toBe(12);
+    const rest = (await (await req("/api/sync", { method: "POST", body: JSON.stringify({ cursor: first.cursor }) })).json()) as SyncResult;
+    expect(rest.done).toBe(true);
+    expect(rest.skipped).toBe(0);
+    expect(rest.partial).toBe(false);
+  });
+
+  it("nulls a stale sectionId instead of failing the whole batch", async () => {
+    const b = (await (await req("/api/boards", { method: "POST", body: JSON.stringify({ name: "Stale" }) })).json()) as Board;
+    const c1 = (await (await req(`/api/boards/${b.id}/cards`, { method: "POST", body: JSON.stringify({ noteId: "n-orphan", x: 0, y: 0 }) })).json()) as Card;
+    const res = await req(`/api/boards/${b.id}/cards`, { method: "PUT", body: JSON.stringify({ cards: [{ id: c1.id, sectionId: "deleted-section", x: 5 }] }) });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ updated: 1 });
+    const detail = (await (await req(`/api/boards/${b.id}`)).json()) as BoardDetail;
+    expect(detail.cards[0]).toMatchObject({ x: 5, sectionId: null });
+    await req(`/api/boards/${b.id}`, { method: "DELETE" });
+  });
+
+  it("treats a backslash in the search query literally", async () => {
+    const r = (await (await req("/api/notes?q=a%5Cb")).json()) as { total: number };
+    expect(r.total).toBe(0);
+    const ok = (await (await req("/api/notes?q=heptabase")).json()) as { total: number };
+    expect(ok.total).toBeGreaterThan(0);
+  });
+});

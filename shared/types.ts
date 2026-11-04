@@ -94,6 +94,10 @@ export type SyncResult = {
   imported: number;
   total: number | null;
   mode: CraftMode;
+  /** Documents skipped so far because Craft returned 403/404/410 for them. */
+  skipped: number;
+  /** True when some folder could not be listed; notes missing from the listing are kept, not marked deleted. */
+  partial: boolean;
 };
 
 export type SyncStatus = {

@@ -63,8 +63,8 @@ notes.get("/notes", async (c) => {
   const where: string[] = ["n.deleted = 0"];
   const binds: unknown[] = [];
   if (q) {
-    where.push("(n.title LIKE ? COLLATE NOCASE OR n.preview LIKE ? COLLATE NOCASE)");
-    const like = `%${q.replace(/[%_]/g, (m) => "\\" + m)}%`;
+    where.push("(n.title LIKE ? OR n.preview LIKE ?)");
+    const like = `%${q.replace(/[\\%_]/g, (m) => "\\" + m)}%`;
     binds.push(like, like);
   }
   if (folder) {

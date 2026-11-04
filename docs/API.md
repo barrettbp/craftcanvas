@@ -38,7 +38,7 @@ type Link = {
 ```
 
 ## Sync (Craft → cache)
-- `POST /api/sync` body `{"cursor"?: string}` → `{"done": boolean, "cursor": string | null, "imported": number, "total": number | null, "mode": "fixture"|"craft"}`. Call again with the returned cursor until `done`. The frontend should wait ≥ 1 s between calls. In fixture mode it completes in one call.
+- `POST /api/sync` body `{"cursor"?: string}` → `{"done": boolean, "cursor": string | null, "imported": number, "total": number | null, "mode": "fixture"|"craft", "skipped": number, "partial": boolean}`. Call again with exactly the returned cursor until `done` (any other cursor → `400 bad_cursor`; start over with `cursor: null`). The frontend should wait ≥ 1 s between calls. `skipped` counts documents Craft refused (403/404/410); `partial` means a folder could not be listed, so nothing was marked deleted.
 - `GET /api/sync/status` → `{"lastSyncAt": string | null, "noteCount": number, "linkCount": number, "mode": string, "running": boolean}`.
 
 ## Boards and layout (the tool's own storage)

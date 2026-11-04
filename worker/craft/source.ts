@@ -7,7 +7,7 @@ import { CraftClient } from "./client";
 import { FIXTURE_SPACE_ID, fixtureDocRefs, fixtureDocument } from "./fixture";
 import type { DocRef, RawDocument } from "./parse";
 
-export type Enumeration = { spaceId: string | null; docs: DocRef[]; meta: Record<string, Record<string, unknown>> };
+export type Enumeration = { spaceId: string | null; docs: DocRef[]; meta: Record<string, Record<string, unknown>>; partial: boolean };
 
 export interface NoteSource {
   readonly mode: "fixture" | "craft";
@@ -18,7 +18,7 @@ export interface NoteSource {
 export class FixtureSource implements NoteSource {
   readonly mode = "fixture" as const;
   async enumerate(): Promise<Enumeration> {
-    return { spaceId: FIXTURE_SPACE_ID, docs: fixtureDocRefs(), meta: {} };
+    return { spaceId: FIXTURE_SPACE_ID, docs: fixtureDocRefs(), meta: {}, partial: false };
   }
   async fetchDocument(ref: DocRef): Promise<RawDocument> {
     const d = fixtureDocument(ref.id);
@@ -35,13 +35,18 @@ export class CraftSource implements NoteSource {
     const conn = await this.client.getConnection().catch(() => ({ spaceId: null, spaceName: null }));
     const seen = new Map<string, DocRef>();
     const meta: Record<string, Record<string, unknown>> = {};
+    let partial = false;
+    const META_KEYS = ["createdAt", "createdDate", "created", "lastModifiedAt", "modifiedAt", "lastModifiedDate", "updatedAt", "clickableLink", "deepLink"];
 
     const absorb = (items: Record<string, unknown>[], folderId: string | null, folderName: string | null) => {
       for (const it of items) {
         const ref = normalizeRef(it);
         if (!ref || seen.has(ref.id)) continue;
         seen.set(ref.id, { ...ref, folderId: ref.folderId ?? folderId, folderName: ref.folderName ?? folderName });
-        meta[ref.id] = it;
+        // Keep only the few metadata strings the sync reads, so the pending blob stays small.
+        const slim: Record<string, unknown> = {};
+        for (const k of META_KEYS) if (typeof it[k] === "string") slim[k] = it[k];
+        meta[ref.id] = slim;
       }
     };
 
@@ -53,16 +58,18 @@ export class CraftSource implements NoteSource {
       folders = await this.client.listFolders();
     } catch {
       folders = [];
+      partial = true;
     }
     for (const f of folders) {
       if (/^(trash|templates)$/i.test(f.id) || /^(trash|templates)$/i.test(f.name)) continue;
       try {
         absorb(await this.client.listDocumentsRaw({ folderId: f.id }), f.id, f.name);
       } catch {
-        // a folder we cannot list is skipped; the rest of the space still imports
+        // a folder we cannot list is skipped; the rest of the space still imports, but nothing gets marked deleted
+        partial = true;
       }
     }
-    return { spaceId: conn.spaceId, docs: Array.from(seen.values()), meta };
+    return { spaceId: conn.spaceId, docs: Array.from(seen.values()), meta, partial };
   }
 
   fetchDocument(ref: DocRef, meta?: Record<string, unknown>): Promise<RawDocument> {
