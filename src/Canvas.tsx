@@ -398,6 +398,8 @@ export default function Canvas({
     const notes = new Map(board.notes.map((note) => [note.id, note]));
     setNodes((current) => {
       const previous = new Map(current.map((n) => [n.id, n]));
+      // Explicit dimensions also let Fit View include nodes never mounted by
+      // viewport culling (for example, after loading a stranded viewport).
       return [
         ...board.sections.map((section) => ({
           id: section.id,
@@ -699,6 +701,12 @@ export default function Canvas({
     });
     return result;
   }, [board.cards, board.connections, board.arrows, links, selectedArrow]);
+  // Key by the input node, so edits naturally invalidate the derived node and
+  // discarded boards/nodes can be collected. Panning preserves data identity.
+  const visibilityCache = useMemo(
+    () => new WeakMap<CanvasNode, CanvasNode>(),
+    [],
+  );
   const { visibleNodes, capped } = useMemo(() => {
     const margin = 200 / viewport.zoom,
       left = -viewport.x / viewport.zoom - margin,
@@ -724,7 +732,13 @@ export default function Canvas({
       visibleNodes: nodes.map((n) => {
         const hidden =
           n.type !== "section" && candidateIds.has(n.id) && !allowed.has(n.id);
-        if (n.type !== "object") return { ...n, hidden };
+        const cached = visibilityCache.get(n);
+        if (n.type !== "object") {
+          if (cached?.hidden === hidden) return cached;
+          const result = { ...n, hidden };
+          visibilityCache.set(n, result);
+          return result;
+        }
         // React Flow briefly mounts off-screen nodes to measure their handles. Gate
         // media independently so that pass never starts PDF work or video requests.
         const visible =
@@ -733,37 +747,51 @@ export default function Canvas({
           n.position.y < bottom - margin &&
           n.position.x + Number(n.style?.width || 260) > left + margin &&
           n.position.y + Number(n.style?.height || 160) > top + margin;
-        return { ...n, hidden, data: { ...n.data, visible } };
+        if (
+          cached?.type === "object" &&
+          cached.hidden === hidden &&
+          cached.data.visible === visible
+        )
+          return cached;
+        const result = { ...n, hidden, data: { ...n.data, visible } };
+        visibilityCache.set(n, result);
+        return result;
       }),
       capped: Math.max(0, candidates.length - CAP),
     };
-  }, [nodes, viewport, size]);
-  const center = () => ({
-    x: (size.width / 2 - viewport.x) / viewport.zoom - 130,
-    y: (size.height / 2 - viewport.y) / viewport.zoom - 80,
-  });
-  const createObject = async (
-    kind: ObjectKind,
-    position: { x: number; y: number },
-    extra: Partial<CanvasObject> = {},
-  ) => {
-    await saver.flush();
-    const object = await objectApi.create(initial.id, {
-      kind,
-      ...position,
-      ...extra,
-    });
-    setBoard((current) => ({
-      ...current,
-      objects: [...current.objects, object],
-    }));
-    setSelected(object.id);
-    setSelectedArrow(undefined);
-    setTool("select");
-    if (kind === "text" || kind === "card") setEditing(object.id);
-    onChanged();
-    return object;
-  };
+  }, [nodes, viewport, size, visibilityCache]);
+  const center = useCallback(
+    () => ({
+      x: (size.width / 2 - viewport.x) / viewport.zoom - 130,
+      y: (size.height / 2 - viewport.y) / viewport.zoom - 80,
+    }),
+    [size, viewport],
+  );
+  const createObject = useCallback(
+    async (
+      kind: ObjectKind,
+      position: { x: number; y: number },
+      extra: Partial<CanvasObject> = {},
+    ) => {
+      await saver.flush();
+      const object = await objectApi.create(initial.id, {
+        kind,
+        ...position,
+        ...extra,
+      });
+      setBoard((current) => ({
+        ...current,
+        objects: [...current.objects, object],
+      }));
+      setSelected(object.id);
+      setSelectedArrow(undefined);
+      setTool("select");
+      if (kind === "text" || kind === "card") setEditing(object.id);
+      onChanged();
+      return object;
+    },
+    [saver, initial.id, onChanged],
+  );
   const video = useRef<HTMLDialogElement>(null),
     [videoUrl, setVideoUrl] = useState(""),
     [videoError, setVideoError] = useState("");
@@ -859,7 +887,7 @@ export default function Canvas({
     };
     window.addEventListener("paste", paste);
     return () => window.removeEventListener("paste", paste);
-  });
+  }, [run, createObject, center]);
   const addNote = async (note: NoteSummary) => {
     try {
       const origin = center();
@@ -1252,7 +1280,11 @@ export default function Canvas({
             <Background gap={24} size={1} />
             <Controls
               showInteractive={false}
-              fitViewOptions={{ maxZoom: 1, padding: 0.2 }}
+              fitViewOptions={{
+                maxZoom: 1,
+                padding: 0.2,
+                includeHiddenNodes: true,
+              }}
             />
             <MiniMap
               pannable
