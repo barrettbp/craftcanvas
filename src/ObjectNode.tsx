@@ -26,9 +26,9 @@ export type ObjectFlowNode = Node<ObjectData, "object">;
 export function ConnectionHandles() {
   return (
     <>
-      <Handle id="left" type="target" position={Position.Left} />
+      <Handle id="left" type="source" position={Position.Left} />
       <Handle id="right" type="source" position={Position.Right} />
-      <Handle id="top" type="target" position={Position.Top} />
+      <Handle id="top" type="source" position={Position.Top} />
       <Handle id="bottom" type="source" position={Position.Bottom} />
     </>
   );
