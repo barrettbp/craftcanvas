@@ -19,7 +19,7 @@
       "binding": "DB",
       "database_name": "craftcanvas-db",
       // Replaced by `wrangler d1 create craftcanvas-db` at deploy time. Local dev and tests ignore it.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "f4e26047-8923-4ddd-bab0-c39fca1b998c",
       "migrations_dir": "migrations"
     }
   ],
