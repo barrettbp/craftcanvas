@@ -84,6 +84,7 @@ describe("runSyncStep with a flaky source", () => {
   it("skips 403/404/410 documents, resolves sub-block links, and keeps unseen notes when enumeration was partial", async () => {
     const db = E.DB;
     await db.prepare("INSERT OR REPLACE INTO notes (id, title, synced_at, deleted) VALUES ('old', 'Old', '2026-01-01', 0)").run();
+    await db.prepare("INSERT OR REPLACE INTO notes (id, space_id, title, synced_at, deleted) VALUES ('fx', 'fixture-space', 'Sample', '2026-01-01', 0)").run();
     const r = await runSyncStep(E, source, null);
     expect(r.done).toBe(true);
     expect(r.imported).toBe(2);
@@ -93,7 +94,9 @@ describe("runSyncStep with a flaky source", () => {
     expect(link?.target_note_id).toBe("c");
     const old = await db.prepare("SELECT deleted FROM notes WHERE id = 'old'").first<{ deleted: number }>();
     expect(old?.deleted).toBe(0);
-    await db.prepare("DELETE FROM notes WHERE id IN ('a','b','c','old')").run();
+    const fx = await db.prepare("SELECT deleted FROM notes WHERE id = 'fx'").first<{ deleted: number }>();
+    expect(fx?.deleted).toBe(1);
+    await db.prepare("DELETE FROM notes WHERE id IN ('a','b','c','old','fx')").run();
   });
 });
 
@@ -107,5 +110,27 @@ describe("CraftClient without an injected fetch", () => {
       message = String((e as Error).message);
     }
     expect(message).not.toContain("Illegal invocation");
+  });
+});
+
+describe("CraftSource enumeration", () => {
+  it("treats a 404 on /folders as a complete listing, not partial", async () => {
+    const { CraftSource } = await import("../worker/craft/source");
+    const client = new CraftClient({
+      connectionUrl: "https://connect.example/links/SECRET/api/v1",
+      minGapMs: 0,
+      maxRetries: 0,
+      fetchImpl: stubFetch((url) => {
+        const last = url.pathname.split("/").pop();
+        if (last === "connection") return new Response(JSON.stringify({ space: { id: "S1", name: "Space" } }), { status: 200 });
+        if (last === "documents") return new Response(JSON.stringify({ items: [{ id: "d1", title: "Doc", createdAt: "2026-01-01T00:00:00Z" }] }), { status: 200 });
+        return new Response("not found", { status: 404 });
+      }),
+    });
+    const e = await new CraftSource(client).enumerate();
+    expect(e.partial).toBe(false);
+    expect(e.spaceId).toBe("S1");
+    expect(e.docs.map((d) => d.id)).toEqual(["d1"]);
+    expect(e.meta.d1).toEqual({ createdAt: "2026-01-01T00:00:00Z" });
   });
 });

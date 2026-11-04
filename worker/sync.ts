@@ -155,6 +155,8 @@ export async function runSyncStep(env: Bindings, source: NoteSource, cursor: str
       db.prepare("DELETE FROM sync_state WHERE key IN ('pending', 'running_since')"),
     ];
     for (const id of gone) finish.push(db.prepare("UPDATE notes SET deleted = 1 WHERE id = ?").bind(id));
+    // Real data replaces the bundled samples.
+    if (source.mode === "craft") finish.push(db.prepare("UPDATE notes SET deleted = 1 WHERE space_id = 'fixture-space'"));
     for (let i = 0; i < finish.length; i += 90) await db.batch(finish.slice(i, i + 90));
   } else {
     await setState(db, "pending", JSON.stringify(pending));

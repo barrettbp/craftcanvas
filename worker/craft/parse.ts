@@ -44,6 +44,7 @@ export function makePreview(markdown: string, max = 280): string {
     .split("\n")
     .filter((l) => !/^#\s/.test(l))
     .join(" ")
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "")
     .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/[*_`>#=]+/g, "")
     .replace(/\s+/g, " ")

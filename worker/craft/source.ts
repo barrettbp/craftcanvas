@@ -3,7 +3,7 @@
  */
 import type { Bindings } from "../env";
 import { craftMode } from "../env";
-import { CraftClient } from "./client";
+import { CraftClient, CraftApiError } from "./client";
 import { FIXTURE_SPACE_ID, fixtureDocRefs, fixtureDocument } from "./fixture";
 import type { DocRef, RawDocument } from "./parse";
 
@@ -56,9 +56,10 @@ export class CraftSource implements NoteSource {
     let folders: { id: string; name: string }[] = [];
     try {
       folders = await this.client.listFolders();
-    } catch {
+    } catch (e) {
       folders = [];
-      partial = true;
+      // A selected-documents connection has no folder listing (4xx): that is complete, not partial.
+      if (!(e instanceof CraftApiError && e.status >= 400 && e.status < 500 && e.status !== 429)) partial = true;
     }
     for (const f of folders) {
       if (/^(trash|templates)$/i.test(f.id) || /^(trash|templates)$/i.test(f.name)) continue;

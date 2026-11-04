@@ -39,6 +39,9 @@ describe("markdown helpers", () => {
   it("makes a preview without the title or markup", () => {
     expect(makePreview(md)).toBe("First line with link. Bold text");
   });
+  it("drops images and keeps link text in previews", () => {
+    expect(makePreview("![](https://r.craft.do/x)\nSee [the doc](block://a) and ![alt](https://img) now **bold**")).toBe("See the doc and now bold");
+  });
   it("cuts long previews", () => {
     const long = "word ".repeat(200);
     const p = makePreview(long, 50);
