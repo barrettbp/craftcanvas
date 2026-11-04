@@ -1,10 +1,12 @@
 import type { Card, Viewport } from "../shared/types";
+import type { CanvasObject } from "./phase2-contract";
 import { boardPath, request } from "./api";
-
-type Change = Partial<Card> & Pick<Card, "id">;
-/** Keep edits until acknowledged; serialize requests so older responses cannot overwrite newer moves. */
+type Change<T> = Partial<T> & { id: string };
+/** Changes remain queued until acknowledged; geometry and content writes are serialized. */
 export class LayoutSaver {
-  private cards = new Map<string, Change>();
+  private cards = new Map<string, Change<Card>>();
+  private objects = new Map<string, Change<CanvasObject>>();
+  private edits = new Map<string, Change<CanvasObject>>();
   private viewport?: Viewport;
   private timer?: ReturnType<typeof setTimeout>;
   private running?: Promise<void>;
@@ -12,8 +14,16 @@ export class LayoutSaver {
     private id: string,
     private report: (state: "saved" | "saving" | "error") => void,
   ) {}
-  card(change: Change) {
+  card(change: Change<Card>) {
     this.cards.set(change.id, { ...this.cards.get(change.id), ...change });
+    this.schedule();
+  }
+  object(change: Change<CanvasObject>) {
+    this.objects.set(change.id, { ...this.objects.get(change.id), ...change });
+    this.schedule();
+  }
+  edit(change: Change<CanvasObject>) {
+    this.edits.set(change.id, { ...this.edits.get(change.id), ...change });
     this.schedule();
   }
   view(viewport: Viewport) {
@@ -28,7 +38,13 @@ export class LayoutSaver {
     }, 300);
   }
   get dirty() {
-    return this.cards.size > 0 || !!this.viewport || !!this.running;
+    return (
+      this.cards.size > 0 ||
+      this.objects.size > 0 ||
+      this.edits.size > 0 ||
+      !!this.viewport ||
+      !!this.running
+    );
   }
   async flush(): Promise<void> {
     clearTimeout(this.timer);
@@ -36,22 +52,43 @@ export class LayoutSaver {
       await this.running;
       return this.flush();
     }
-    const cards = [...this.cards.values()];
-    const viewport = this.viewport;
-    if (!cards.length && !viewport) return;
+    const cards = [...this.cards.values()],
+      objects = [...this.objects.values()],
+      edits = [...this.edits.values()],
+      viewport = this.viewport;
+    if (!cards.length && !objects.length && !edits.length && !viewport) return;
     this.cards.clear();
+    this.objects.clear();
+    this.edits.clear();
     this.viewport = undefined;
     this.report("saving");
     this.running = (async () => {
       try {
-        for (let i = 0; i < cards.length; i += 500)
-          await request(`${boardPath(this.id)}/cards`, "PUT", {
-            cards: cards.slice(i, i + 500),
-          });
+        for (const [kind, changes] of [
+          ["cards", cards],
+          ["objects", objects],
+        ] as const) {
+          for (let i = 0; i < changes.length; i += 500)
+            await request(`${boardPath(this.id)}/${kind}`, "PUT", {
+              [kind]: changes.slice(i, i + 500),
+            });
+        }
+        for (const { id, ...edit } of edits)
+          await request(
+            `${boardPath(this.id)}/objects/${encodeURIComponent(id)}`,
+            "PATCH",
+            edit,
+          );
         if (viewport) await request(boardPath(this.id), "PATCH", { viewport });
       } catch (error) {
-        cards.forEach((card) =>
-          this.cards.set(card.id, { ...card, ...this.cards.get(card.id) }),
+        cards.forEach((c) =>
+          this.cards.set(c.id, { ...c, ...this.cards.get(c.id) }),
+        );
+        objects.forEach((o) =>
+          this.objects.set(o.id, { ...o, ...this.objects.get(o.id) }),
+        );
+        edits.forEach((o) =>
+          this.edits.set(o.id, { ...o, ...this.edits.get(o.id) }),
         );
         this.viewport ??= viewport;
         this.report("error");
@@ -61,7 +98,7 @@ export class LayoutSaver {
       }
     })();
     await this.running;
-    if (this.cards.size || this.viewport) return this.flush();
+    if (this.dirty) return this.flush();
     this.report("saved");
   }
 }

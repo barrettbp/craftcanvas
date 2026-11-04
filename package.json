@@ -18,6 +18,7 @@
   "dependencies": {
     "@xyflow/react": "^12.12.1",
     "hono": "^4.13.16",
+    "pdfjs-dist": "^6.5.438",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
     "react-markdown": "^10.1.0"
