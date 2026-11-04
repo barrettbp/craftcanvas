@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Board, BoardDetail, Link, SyncStatus } from "../shared/types";
+import type { Board, BoardDetailV2, Link, SyncStatus } from "../shared/types";
 import { api, boardPath, message, request } from "./api";
 const Canvas = lazy(() => import("./Canvas"));
 import "./styles.css";
@@ -14,7 +14,9 @@ import "./styles.css";
 type Dialog = { kind: "create" } | { kind: "rename" | "delete"; board: Board };
 export default function App() {
   const [boards, setBoards] = useState<Board[]>([]);
-  const [active, setActive] = useState<BoardDetail>();
+  const [active, setActive] = useState<BoardDetailV2>();
+  const [focus, setFocus] = useState<{ id: string; stamp: number }>();
+  const navigationGuard = useRef<(() => Promise<void>) | undefined>(undefined);
   const [links, setLinks] = useState<Link[]>([]);
   const [status, setStatus] = useState<SyncStatus>();
   const [loading, setLoading] = useState(true);
@@ -68,14 +70,21 @@ export default function App() {
     }, 30000);
     return () => clearInterval(timer);
   }, []);
-  const openBoard = async (id: string) => {
+  const openBoard = useCallback(async (id: string, focusId?: string) => {
     const generation = ++opening.current;
     setLoading(true);
     setError("");
     try {
+      await navigationGuard.current?.();
       const board = await api.board(id);
       if (generation === opening.current) {
         setActive(board);
+        setFocus(focusId ? { id: focusId, stamp: Date.now() } : undefined);
+        history.replaceState(
+          null,
+          "",
+          `#/board/${encodeURIComponent(id)}${focusId ? `?focus=${encodeURIComponent(focusId)}` : ""}`,
+        );
         document.title = `${board.name} · CraftCanvas`;
       }
     } catch (e) {
@@ -83,7 +92,24 @@ export default function App() {
     } finally {
       if (generation === opening.current) setLoading(false);
     }
-  };
+  }, []);
+  useEffect(() => {
+    const route = () => {
+      const match = location.hash.match(/^#\/board\/([^?]+)(?:\?(.*))?$/);
+      if (!match) return;
+      try {
+        void openBoard(
+          decodeURIComponent(match[1]),
+          new URLSearchParams(match[2]).get("focus") || undefined,
+        );
+      } catch {
+        setError("This board link is invalid.");
+      }
+    };
+    route();
+    window.addEventListener("hashchange", route);
+    return () => window.removeEventListener("hashchange", route);
+  }, [openBoard]);
   const sync = async () => {
     if (syncLock.current) return;
     syncLock.current = true;
@@ -219,13 +245,21 @@ export default function App() {
           <Canvas
             key={active.id}
             initial={active}
+            focus={focus}
+            navigationGuard={navigationGuard}
             links={links}
             onBack={() => {
               setActive(undefined);
+              setFocus(undefined);
+              history.replaceState(
+                null,
+                "",
+                location.pathname + location.search,
+              );
               document.title = "CraftCanvas";
               refreshBoards();
             }}
-            onOpenBoard={(id) => void openBoard(id)}
+            onOpenBoard={(id, focusId) => void openBoard(id, focusId)}
             revision={revision}
             onChanged={refreshBoards}
           />

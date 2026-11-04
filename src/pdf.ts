@@ -10,7 +10,7 @@ GlobalWorkerOptions.workerSrc = workerUrl;
 // Vite emits these npm-bundled resources on this origin, including CJK maps and codecs.
 const binaries = import.meta.glob<string>(
   "/node_modules/pdfjs-dist/{cmaps,standard_fonts,wasm}/*",
-  { eager: true, query: "?url", import: "default" },
+  { eager: true, query: "?url&no-inline", import: "default" },
 );
 class LocalBinaryFactory {
   async fetch({ kind, filename }: { kind: string; filename: string }) {
@@ -32,7 +32,6 @@ export async function openPdf(id: string, signal?: AbortSignal) {
   signal?.throwIfAborted();
   const task = getDocument({
     data,
-    isEvalSupported: false,
     useWorkerFetch: false,
     BinaryDataFactory: LocalBinaryFactory,
   });

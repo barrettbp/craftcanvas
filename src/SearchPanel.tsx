@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { NoteSummary } from "../shared/types";
-import type { SearchResult } from "./phase2-contract";
+import type { SearchResult } from "../shared/types";
 import { api, message } from "./api";
 import { objectApi } from "./objects-api";
 // Split only exact <mark> tokens. Every other character is escaped by React.

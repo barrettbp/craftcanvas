@@ -1,5 +1,5 @@
 import type { Card, Viewport } from "../shared/types";
-import type { CanvasObject } from "./phase2-contract";
+import type { CanvasObject } from "../shared/types";
 import { boardPath, request } from "./api";
 type Change<T> = Partial<T> & { id: string };
 /** Changes remain queued until acknowledged; geometry and content writes are serialized. */

@@ -7,6 +7,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type RefObject,
 } from "react";
 import {
   Background,
@@ -24,7 +25,6 @@ import {
   type ReactFlowInstance,
 } from "@xyflow/react";
 import type {
-  BoardDetail,
   Card,
   Link,
   NoteSummary,
@@ -34,11 +34,11 @@ import type {
 import type {
   Arrow,
   ArrowEnd,
-  CanvasBoard,
+  BoardDetailV2 as CanvasBoard,
   CanvasObject,
   ObjectKind,
   SearchResult,
-} from "./phase2-contract";
+} from "../shared/types";
 import { api, boardPath, message, request, RequestError } from "./api";
 import { objectApi, upload } from "./objects-api";
 import { LayoutSaver } from "./layout";
@@ -106,6 +106,7 @@ const SectionNode = memo(function SectionNode({
     <div className={`section-node ${selected ? "is-selected" : ""}`}>
       <NodeResizer
         isVisible={selected}
+        color="var(--accent)"
         minWidth={300}
         minHeight={200}
         onResizeEnd={(_, rect) => data.resize(data.section.id, rect)}
@@ -152,10 +153,10 @@ const endpoint = (node: CanvasNode): ArrowEnd | null =>
     : { kind: node.type === "note" ? "card" : "object", id: node.id };
 const colorValue = (color: string | null) =>
   color && /^#[0-9a-f]{6}$/i.test(color) ? color : "#a9543c";
-const normalize = (board: BoardDetail): CanvasBoard => ({
+const normalize = (board: CanvasBoard): CanvasBoard => ({
   ...board,
-  objects: (board as CanvasBoard).objects || [],
-  arrows: (board as CanvasBoard).arrows || [],
+  objects: board.objects || [],
+  arrows: board.arrows || [],
 });
 
 export default function Canvas({
@@ -166,14 +167,16 @@ export default function Canvas({
   revision,
   onChanged,
   focus,
+  navigationGuard,
 }: {
-  initial: BoardDetail;
+  initial: CanvasBoard;
   links: Link[];
   onBack: () => void;
   onOpenBoard: (id: string, focusId?: string) => void;
   revision: number;
   onChanged: () => void;
   focus?: FocusTarget;
+  navigationGuard: RefObject<(() => Promise<void>) | undefined>;
 }) {
   const [board, setBoard] = useState(() => normalize(initial));
   const boardRef = useRef(board);
@@ -220,6 +223,7 @@ export default function Canvas({
   const flush = useCallback(() => {
     void saver.flush().catch((e) => setError(message(e)));
   }, [saver]);
+  const navigationBypass = useRef(false);
   const navigate = (action: () => void) => {
     if (operations.current) {
       setError("Please wait for the current upload or operation to finish.");
@@ -228,9 +232,24 @@ export default function Canvas({
     void run(async () => {
       await saver.flush();
       onChanged();
-      action();
+      navigationBypass.current = true;
+      try {
+        action();
+      } finally {
+        navigationBypass.current = false;
+      }
     });
   };
+  useEffect(() => {
+    navigationGuard.current = async () => {
+      if (operations.current && !navigationBypass.current)
+        throw new Error("Please wait for the current operation to finish.");
+      await saver.flush();
+    };
+    return () => {
+      navigationGuard.current = undefined;
+    };
+  }, [navigationGuard, saver]);
   const openPdf = useCallback((id: string, page = 1) => {
     setPdf({ id, page });
     setNoteId(undefined);
@@ -384,6 +403,9 @@ export default function Canvas({
           id: section.id,
           type: "section" as const,
           position: { x: section.x, y: section.y },
+          width: section.w,
+          height: section.h,
+          measured: { width: section.w, height: section.h },
           style: { width: section.w, height: section.h },
           zIndex: -1,
           dragHandle: ".section-grip",
@@ -401,6 +423,9 @@ export default function Canvas({
           position: previous.get(card.id)?.dragging
             ? previous.get(card.id)!.position
             : { x: card.x, y: card.y },
+          width: card.w,
+          height: card.folded ? 64 : card.h,
+          measured: { width: card.w, height: card.folded ? 64 : card.h },
           style: { width: card.w, height: card.folded ? 64 : card.h },
           zIndex: card.z,
           selected: selected === card.id,
@@ -412,12 +437,15 @@ export default function Canvas({
           position: previous.get(object.id)?.dragging
             ? previous.get(object.id)!.position
             : { x: object.x, y: object.y },
+          width: object.w,
+          height: object.h,
+          measured: { width: object.w, height: object.h },
           style: { width: object.w, height: object.h },
           zIndex: object.z,
           selected: selected === object.id,
           dragHandle:
             object.kind === "youtube" ? ".object-titlebar" : undefined,
-          draggable: editing !== object.id,
+          draggable: editing === object.id ? false : undefined,
           data: {
             object,
             editing: editing === object.id,
@@ -427,6 +455,7 @@ export default function Canvas({
             extract,
             openPdf,
             mediaRevision,
+            visible: false,
           },
         })),
       ];
@@ -533,9 +562,10 @@ export default function Canvas({
         flush();
       }
       if (
-        (event.target as HTMLElement).closest(
-          'input,textarea,select,button,a,[contenteditable="true"],[role="dialog"]',
-        ) ||
+        (event.target instanceof Element &&
+          event.target.closest(
+            'input,textarea,select,button,a,[contenteditable="true"],[role="dialog"]',
+          )) ||
         event.metaKey ||
         event.ctrlKey ||
         event.altKey
@@ -691,11 +721,20 @@ export default function Canvas({
       ),
       candidateIds = new Set(candidates.map((n) => n.id));
     return {
-      visibleNodes: nodes.map((n) => ({
-        ...n,
-        hidden:
-          n.type !== "section" && candidateIds.has(n.id) && !allowed.has(n.id),
-      })),
+      visibleNodes: nodes.map((n) => {
+        const hidden =
+          n.type !== "section" && candidateIds.has(n.id) && !allowed.has(n.id);
+        if (n.type !== "object") return { ...n, hidden };
+        // React Flow briefly mounts off-screen nodes to measure their handles. Gate
+        // media independently so that pass never starts PDF work or video requests.
+        const visible =
+          !hidden &&
+          n.position.x < right - margin &&
+          n.position.y < bottom - margin &&
+          n.position.x + Number(n.style?.width || 260) > left + margin &&
+          n.position.y + Number(n.style?.height || 160) > top + margin;
+        return { ...n, hidden, data: { ...n.data, visible } };
+      }),
       capped: Math.max(0, candidates.length - CAP),
     };
   }, [nodes, viewport, size]);
@@ -744,7 +783,10 @@ export default function Canvas({
           file,
           (percent) => setMediaStatus(`Uploading ${file.name} · ${percent}%`),
           controller.signal,
-        );
+        ).catch((error) => {
+          setMediaStatus("Upload failed");
+          throw error;
+        });
         try {
           await createObject(
             asset.kind,
@@ -754,10 +796,11 @@ export default function Canvas({
               title: asset.filename,
               ...(asset.kind === "image" && asset.width && asset.height
                 ? {
-                    w: Math.min(asset.width, 420),
+                    w: Math.max(180, Math.min(asset.width, 420)),
                     h:
                       Math.round(
-                        (asset.height * Math.min(asset.width, 420)) /
+                        (asset.height *
+                          Math.max(180, Math.min(asset.width, 420))) /
                           asset.width,
                       ) + 90,
                   }
@@ -792,9 +835,8 @@ export default function Canvas({
   useEffect(() => {
     const paste = (event: ClipboardEvent) => {
       if (
-        (event.target as HTMLElement).closest(
-          'input,textarea,[contenteditable="true"],dialog',
-        )
+        event.target instanceof Element &&
+        event.target.closest('input,textarea,[contenteditable="true"],dialog')
       )
         return;
       const text = event.clipboardData?.getData("text/plain").trim();
@@ -1072,6 +1114,23 @@ export default function Canvas({
                 if (change.type === "select" && change.selected) {
                   setSelected(change.id);
                   setSelectedArrow(undefined);
+                }
+            }}
+            onEdgesChange={(changes) => {
+              for (const change of changes)
+                if (
+                  change.type === "select" &&
+                  change.id.startsWith("arrow-")
+                ) {
+                  if (change.selected) {
+                    setSelectedArrow(change.id.slice(6));
+                    setSelected(undefined);
+                    setNoteId(undefined);
+                    setPdf(undefined);
+                  } else
+                    setSelectedArrow((current) =>
+                      current === change.id.slice(6) ? undefined : current,
+                    );
                 }
             }}
             onEdgeClick={(_, edge) => {

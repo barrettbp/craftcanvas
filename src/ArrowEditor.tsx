@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Arrow, ArrowType } from "./phase2-contract";
+import type { Arrow, ArrowType } from "../shared/types";
 import { message } from "./api";
 export default function ArrowEditor({
   arrow,

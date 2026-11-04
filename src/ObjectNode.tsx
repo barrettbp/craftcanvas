@@ -6,7 +6,7 @@ import {
   type Node,
   type NodeProps,
 } from "@xyflow/react";
-import type { Asset, CanvasObject } from "./phase2-contract";
+import type { Asset, CanvasObject } from "../shared/types";
 import { assetUrl, objectApi } from "./objects-api";
 import { message } from "./api";
 import SafeMarkdown from "./SafeMarkdown";
@@ -20,6 +20,7 @@ export type ObjectData = {
   extract: (id: string) => void;
   openPdf: (id: string, page?: number) => void;
   mediaRevision: number;
+  visible: boolean;
 };
 export type ObjectFlowNode = Node<ObjectData, "object">;
 export function ConnectionHandles() {
@@ -66,7 +67,10 @@ export default memo(function ObjectNode({
 }: NodeProps<ObjectFlowNode>) {
   const { object, editing } = data;
   const textarea = useRef<HTMLTextAreaElement>(null);
-  const { asset, error } = useAsset(object.assetId, data.mediaRevision);
+  const { asset, error } = useAsset(
+    data.visible ? object.assetId : null,
+    data.mediaRevision,
+  );
   useEffect(() => {
     if (editing && textarea.current) {
       textarea.current.style.height = "auto";
@@ -91,7 +95,11 @@ export default memo(function ObjectNode({
     });
   };
   let embed: string | undefined;
-  if (object.kind === "youtube" && typeof object.meta.embedUrl === "string") {
+  if (
+    object.kind === "youtube" &&
+    data.visible &&
+    typeof object.meta.embedUrl === "string"
+  ) {
     try {
       const url = new URL(object.meta.embedUrl);
       if (
@@ -126,6 +134,7 @@ export default memo(function ObjectNode({
     >
       <NodeResizer
         isVisible={selected && !editing}
+        color="var(--accent)"
         minWidth={180}
         minHeight={object.kind === "text" ? 64 : 140}
         onResizeEnd={(_, r) =>
@@ -143,6 +152,7 @@ export default memo(function ObjectNode({
               autoFocus
               className="nodrag nowheel"
               aria-label="Object title"
+              maxLength={500}
               value={object.title || ""}
               placeholder="Untitled card"
               onChange={(e) =>
@@ -160,7 +170,7 @@ export default memo(function ObjectNode({
         </div>
       )}
       {error && <p className="error">{error}</p>}
-      {object.kind === "image" && imageUrl && (
+      {object.kind === "image" && data.visible && imageUrl && (
         <img
           className="object-image"
           draggable={false}
@@ -170,7 +180,7 @@ export default memo(function ObjectNode({
           }
         />
       )}
-      {object.kind === "pdf" && object.assetId && (
+      {object.kind === "pdf" && data.visible && object.assetId && (
         <>
           <button
             className="pdf-open nodrag"
@@ -190,6 +200,7 @@ export default memo(function ObjectNode({
         </>
       )}
       {object.kind === "youtube" &&
+        data.visible &&
         (embed ? (
           <iframe
             className="nodrag nowheel"
@@ -206,6 +217,7 @@ export default memo(function ObjectNode({
       {editing ? (
         <textarea
           ref={textarea}
+          maxLength={100000}
           autoFocus
           className="object-editor nodrag nowheel"
           aria-label={

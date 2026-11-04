@@ -7,7 +7,7 @@ import type {
   CanvasObject,
   ObjectKind,
   SearchResult,
-} from "./phase2-contract";
+} from "../shared/types";
 export const objectsPath = (boardId: string) => `${boardPath(boardId)}/objects`;
 export const assetPath = (id: string) =>
   `/api/assets/${encodeURIComponent(id)}`;
@@ -70,6 +70,11 @@ export async function upload(
   progress: (percent: number) => void,
   signal?: AbortSignal,
 ): Promise<Asset> {
+  // Enforce the published limits before allocating/transporting oversized bodies.
+  if (file.type === "application/pdf" && file.size > 25 * 1024 * 1024)
+    throw new RequestError(413, "PDFs are limited to 25 MB.");
+  if (file.type.startsWith("image/") && file.size > 10 * 1024 * 1024)
+    throw new RequestError(413, "Images are limited to 10 MB.");
   const form = new FormData();
   form.append("file", file);
   if (
@@ -107,7 +112,13 @@ export async function upload(
       try {
         result = JSON.parse(xhr.responseText);
       } catch {
-        reject(new Error("Upload returned an invalid response."));
+        const fallback =
+          xhr.status === 413
+            ? "File too large. Images up to 10 MB, PDFs up to 25 MB."
+            : xhr.status === 415
+              ? "Only PNG, JPEG, GIF, WebP images and PDF files are accepted."
+              : `Upload failed (${xhr.status}). Please try again.`;
+        reject(new RequestError(xhr.status, fallback));
         return;
       }
       if (xhr.status < 200 || xhr.status >= 300)
