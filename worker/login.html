@@ -7,13 +7,15 @@
     <title>CraftCanvas</title>
     <style>
       /* Codex may restyle this page. Keep it self-contained: no external assets, no scripts beyond the form. */
-      :root { color-scheme: light dark; --bg: #f6f5f2; --fg: #1d1c1a; --card: #ffffff; --accent: #2f6df6; --muted: #6b6a66; --err: #c0392b; }
-      @media (prefers-color-scheme: dark) { :root { --bg: #151514; --fg: #ecebe7; --card: #1f1f1d; --muted: #9c9b96; } }
+      :root { color-scheme: light dark; --bg: #f8f6f2; --fg: #38342f; --card: #fffefa; --accent: #a9543c; --muted: #817970; --err: #c0392b; }
+      @media (prefers-color-scheme: dark) { :root { --bg: #22211f; --fg: #e6dfd4; --card: #2b2926; --muted: #aaa093; --accent: #ba7358; } }
       * { box-sizing: border-box; }
       body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--fg);
              font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-      form { width: min(360px, 92vw); background: var(--card); border-radius: 12px; padding: 28px; box-shadow: 0 8px 30px rgba(0,0,0,.08); }
-      h1 { font-size: 20px; margin: 0 0 4px; }
+      form { width: min(400px, 92vw); background: var(--card); border-radius: 12px; padding: 36px; border: 1px solid rgba(127,127,127,.18); box-shadow: 0 8px 30px rgba(0,0,0,.08); }
+      h1 { font: 32px/1.2 Georgia, serif; letter-spacing: -1px; margin: 0 0 14px; }
+      h1::before { content: "▧"; display: block; font: 36px system-ui; color: var(--accent); margin-bottom: 28px; }
+      input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
       p { margin: 0 0 18px; color: var(--muted); font-size: 13px; }
       label { display: block; font-size: 13px; margin-bottom: 6px; }
       input { width: 100%; padding: 10px 12px; border: 1px solid rgba(127,127,127,.35); border-radius: 8px; background: transparent; color: inherit; font: inherit; }
@@ -24,7 +26,7 @@
   <body>
     <form id="login" method="post" action="/api/auth/login" autocomplete="off">
       <h1>CraftCanvas</h1>
-      <p>Private canvas. Sign in to continue.</p>
+      <p>A quiet space for connected thinking.<br />Sign in to your private canvas.</p>
       <label for="password">Password</label>
       <input id="password" name="password" type="password" required autofocus />
       <button type="submit">Sign in</button>
