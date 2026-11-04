@@ -93,9 +93,13 @@ export default function App() {
     try {
       let cursor: string | undefined;
       let imported = 0;
+      let skipped = 0;
+      let partial = false;
       do {
         const result = await api.sync(cursor);
         imported += result.imported;
+        skipped = result.skipped;
+        partial ||= result.partial;
         setProgress(
           `${imported} notes imported${result.total === null ? "" : ` / ${result.total}`}`,
         );
@@ -111,7 +115,9 @@ export default function App() {
       setStatus(status);
       setLinks(links.items);
       setRevision((n) => n + 1);
-      setProgress("Sync complete");
+      setProgress(
+        `Sync complete${skipped ? ` · ${skipped} unavailable notes skipped` : ""}${partial ? " · Partial library; existing notes retained" : ""}`,
+      );
     } catch (e) {
       setError(message(e));
       setProgress("Sync interrupted. Try again.");

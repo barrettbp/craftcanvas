@@ -5,11 +5,13 @@ import { api, message } from "./api";
 
 export default function NotePanel({
   id,
+  revision,
   onClose,
   onNote,
   onBoard,
 }: {
   id: string;
+  revision: number;
   onClose: () => void;
   onNote: (id: string) => void;
   onBoard: (id: string) => void;
@@ -28,7 +30,7 @@ export default function NotePanel({
         if (!controller.signal.aborted) setError(message(e));
       });
     return () => controller.abort();
-  }, [id, retry]);
+  }, [id, retry, revision]);
   // Note bodies are untrusted: no remote images, raw HTML, embeds, or external navigation.
   const internalLink = (href?: string) => {
     if (!href?.startsWith("block://")) return undefined;

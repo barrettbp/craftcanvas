@@ -147,6 +147,25 @@ export default function Canvas({
   onChanged: () => void;
 }) {
   const [board, setBoard] = useState(initial);
+  const lastRevision = useRef(revision);
+  useEffect(() => {
+    if (lastRevision.current === revision) return;
+    lastRevision.current = revision;
+    let cancelled = false;
+    // Sync refreshes note content without replacing unsaved board geometry.
+    api
+      .board(initial.id)
+      .then((fresh) => {
+        if (!cancelled)
+          setBoard((current) => ({ ...current, notes: fresh.notes }));
+      })
+      .catch((e) => {
+        if (!cancelled) setError(message(e));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [revision, initial.id]);
   const boardRef = useRef(board);
   boardRef.current = board;
   const [nodes, setNodes] = useState<CanvasNode[]>([]);
@@ -681,6 +700,7 @@ export default function Canvas({
           <Suspense fallback={<aside className="reader">Opening note…</aside>}>
             <NotePanel
               id={noteId}
+              revision={revision}
               onClose={() => setNoteId(undefined)}
               onNote={setNoteId}
               onBoard={(id) => navigate(() => onOpenBoard(id))}
