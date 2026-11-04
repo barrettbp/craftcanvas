@@ -159,7 +159,8 @@ export function blocksToMarkdown(root: unknown): { markdown: string; blockIds: s
     if (id) ids.push(id);
     const type = pickString(b, ["type"]);
     if (type === "page" || (depth === 0 && b.title !== undefined)) {
-      const t = normalizeTitle(b.title);
+      // Craft's JSON puts a page's title in `markdown` (verified 2026-11-04); older docs mention `title`.
+      const t = normalizeTitle(b.title) || (pickString(b, ["markdown"]) ?? "").trim();
       if (t) {
         if (title === null && depth === 0) title = t;
         lines.push(`${"#".repeat(Math.min(6, depth + 1))} ${t}`);

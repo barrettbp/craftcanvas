@@ -101,7 +101,7 @@ describe("normalisers", () => {
       content: [
         { id: "b1", type: "text", markdown: "Hello [x](block://z)", indentationLevel: 0 },
         { id: "b2", type: "text", markdown: "item", listStyle: "bullet", indentationLevel: 1 },
-        { id: "p2", type: "page", title: "Sub", content: [{ id: "b3", type: "text", markdown: "deep" }] },
+        { id: "p2", type: "page", markdown: "Sub", content: [{ id: "b3", type: "text", markdown: "deep" }] },
       ],
     };
     const out = blocksToMarkdown(tree);
