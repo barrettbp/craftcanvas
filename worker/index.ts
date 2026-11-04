@@ -12,6 +12,8 @@ const app = new Hono<AppEnv>();
 // Private tool: never indexed, never cached by intermediaries.
 app.use("*", async (c, next) => {
   await next();
+  // Responses from the ASSETS binding carry immutable headers; re-wrap before adding ours.
+  c.res = new Response(c.res.body, c.res);
   c.res.headers.set("X-Robots-Tag", "noindex, nofollow, noarchive");
   c.res.headers.set("Cache-Control", "no-store");
   c.res.headers.set("X-Content-Type-Options", "nosniff");
