@@ -126,6 +126,12 @@ export class CraftClient {
     return items.filter((x): x is Record<string, unknown> => typeof x === "object" && x !== null);
   }
 
+  /** Raw response for one document, for shape debugging. format "markdown" uses Accept: text/markdown. */
+  async getDocumentRaw(id: string, format: "json" | "markdown"): Promise<string> {
+    const res = await this.request("/blocks", { id, maxDepth: "-1", fetchMetadata: "true" }, format === "json" ? "application/json" : "text/markdown");
+    return res.text();
+  }
+
   /** Full document as markdown plus every block id. Tries JSON first; falls back to text/markdown. */
   async getDocument(ref: DocRef, meta?: Record<string, unknown>): Promise<RawDocument> {
     let markdown = "";

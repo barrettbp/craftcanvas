@@ -1,6 +1,8 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { clampInt } from "../util";
+import { craftMode } from "../env";
+import { CraftApiError, CraftClient } from "../craft/client";
 import type { Folder, Link, Note, NoteSummary } from "../../shared/types";
 
 type NoteRow = {
@@ -110,6 +112,20 @@ notes.get("/notes/:id", async (c) => {
     boards: (boards.results ?? []).map((b) => ({ boardId: b.board_id, boardName: b.board_name, cardId: b.card_id })),
   };
   return c.json(note);
+});
+
+/** Debug: the raw Craft response for one document (craft mode only). Never includes the connection URL. */
+notes.get("/notes/:id/raw", async (c) => {
+  if (craftMode(c.env) !== "craft" || !c.env.CRAFT_CONNECTION_URL) return c.json({ error: "not_available", message: "Only in craft mode." }, 404);
+  const format = c.req.query("format") === "json" ? "json" : "markdown";
+  const client = new CraftClient({ connectionUrl: c.env.CRAFT_CONNECTION_URL, token: c.env.CRAFT_API_TOKEN });
+  try {
+    const body = await client.getDocumentRaw(c.req.param("id"), format);
+    return c.text(body, 200, { "content-type": format === "json" ? "application/json; charset=utf-8" : "text/markdown; charset=utf-8" });
+  } catch (e) {
+    if (e instanceof CraftApiError) return c.json({ error: "craft_api", message: `Craft API returned ${e.status} on ${e.path}.` }, e.status === 429 ? 429 : 502);
+    throw e;
+  }
 });
 
 notes.get("/notes/:id/boards", async (c) => {

@@ -18,6 +18,7 @@ IDs are strings. Timestamps are ISO-8601 strings. Coordinates are numbers in can
 - `GET /api/notes/:id` → `Note` (full markdown, outgoing and incoming links, boards that hold it).
 - `GET /api/notes/:id/boards` → `{"items": [{"boardId","boardName","cardId","x","y"}]}`.
 - `GET /api/links` → `{"items": Link[]}` for every resolved note-to-note link (both ends in the cache). Used to draw arrows.
+- `GET /api/notes/:id/raw?format=markdown|json` → the raw Craft response for one document (debugging; `404` in fixture mode).
 - `GET /api/folders` → `{"items": [{"id","name","noteCount"}]}`.
 
 ```ts

@@ -156,6 +156,10 @@ describe("sync, notes and links (fixture mode)", () => {
     expect(links.items.some((l) => l.sourceNoteId === "n-weekly-review" && l.targetNoteId === "n-reading-list")).toBe(true);
   });
 
+  it("has no raw endpoint in fixture mode", async () => {
+    expect((await req("/api/notes/n-heptabase/raw")).status).toBe(404);
+  });
+
   it("lists folders with counts", async () => {
     const f = (await (await req("/api/folders")).json()) as { items: { id: string; name: string; noteCount: number }[] };
     expect(f.items).toEqual([
