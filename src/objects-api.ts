@@ -56,7 +56,26 @@ export const objectApi = {
       signal,
     ),
 };
-export async function assetBytes(id: string) {
+const assetDownloads = new Map<
+  string,
+  { revision: number; bytes: Promise<ArrayBuffer> }
+>();
+export function assetBytes(
+  id: string,
+  revision?: number,
+): Promise<ArrayBuffer> {
+  let cached = assetDownloads.get(id);
+  if (!cached || (revision !== undefined && cached.revision !== revision)) {
+    const bytes = downloadAsset(id);
+    cached = { revision: revision ?? 0, bytes };
+    assetDownloads.set(id, cached);
+    void bytes.catch(() => {
+      if (assetDownloads.get(id)?.bytes === bytes) assetDownloads.delete(id);
+    });
+  }
+  return cached.bytes;
+}
+async function downloadAsset(id: string) {
   const response = await fetch(assetPath(id), { credentials: "same-origin" });
   if (response.status === 401) {
     window.location.assign("/login");
@@ -83,10 +102,14 @@ export async function upload(
     ) &&
     file.size <= 10 * 1024 * 1024
   ) {
-    const bitmap = await createImageBitmap(file);
-    form.append("width", String(bitmap.width));
-    form.append("height", String(bitmap.height));
-    bitmap.close();
+    try {
+      const bitmap = await createImageBitmap(file);
+      form.append("width", String(bitmap.width));
+      form.append("height", String(bitmap.height));
+      bitmap.close();
+    } catch {
+      // Dimensions are optional; let the upload endpoint validate the file.
+    }
   }
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();

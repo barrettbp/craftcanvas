@@ -5,10 +5,12 @@ import { message } from "./api";
 export default function PdfPanel({
   assetId,
   initialPage = 1,
+  mediaRevision,
   onClose,
 }: {
   assetId: string;
   initialPage?: number;
+  mediaRevision: number;
   onClose: () => void;
 }) {
   const [doc, setDoc] = useState<PDFDocumentProxy>(),
@@ -25,7 +27,7 @@ export default function PdfPanel({
     let destroy: (() => Promise<void>) | undefined;
     setDoc(undefined);
     setError("");
-    openPdf(assetId, controller.signal)
+    openPdf(assetId, controller.signal, mediaRevision)
       .then((handle) => {
         destroy = handle.destroy;
         if (controller.signal.aborted) {
@@ -42,7 +44,7 @@ export default function PdfPanel({
       controller.abort();
       void destroy?.();
     };
-  }, [assetId, retry]);
+  }, [assetId, retry, mediaRevision]);
   useEffect(() => {
     if (!doc) return;
     let stopped = false;

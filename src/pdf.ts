@@ -27,11 +27,16 @@ class LocalBinaryFactory {
     return new Uint8Array(await response.arrayBuffer());
   }
 }
-export async function openPdf(id: string, signal?: AbortSignal) {
-  const data = await assetBytes(id);
+export async function openPdf(
+  id: string,
+  signal?: AbortSignal,
+  revision?: number,
+) {
+  const bytes = await assetBytes(id, revision);
   signal?.throwIfAborted();
   const task = getDocument({
-    data,
+    // PDF.js transfers this buffer to its worker. Preserve the cached original.
+    data: bytes.slice(0),
     useWorkerFetch: false,
     BinaryDataFactory: LocalBinaryFactory,
   });
@@ -60,12 +65,13 @@ export async function withPdf<T>(
   id: string,
   signal: AbortSignal,
   action: (pdf: PDFDocumentProxy) => Promise<T>,
+  revision?: number,
 ): Promise<T> {
   if (active >= 2) await new Promise<void>((resolve) => waiting.push(resolve));
   else active++;
   try {
     signal.throwIfAborted();
-    const handle = await openPdf(id, signal);
+    const handle = await openPdf(id, signal, revision);
     try {
       return await action(handle.doc);
     } finally {

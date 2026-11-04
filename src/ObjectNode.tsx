@@ -188,7 +188,10 @@ export default memo(function ObjectNode({
             onClick={() => data.openPdf(object.assetId!)}
           >
             <Suspense fallback={<span>Loading PDF…</span>}>
-              <PdfPreview assetId={object.assetId} />
+              <PdfPreview
+                assetId={object.assetId}
+                mediaRevision={data.mediaRevision}
+              />
             </Suspense>
           </button>
           <button
@@ -207,6 +210,7 @@ export default memo(function ObjectNode({
             src={embed}
             title={object.title || "YouTube video"}
             loading="lazy"
+            sandbox="allow-scripts allow-same-origin allow-presentation allow-popups allow-popups-to-escape-sandbox"
             referrerPolicy="strict-origin-when-cross-origin"
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen

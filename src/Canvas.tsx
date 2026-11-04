@@ -842,17 +842,20 @@ export default function Canvas({
           throw e;
         }
         if (asset.kind === "pdf") {
-          const { extractPdf } = await import("./pdf");
           try {
+            const { extractPdf } = await import("./pdf");
             setMediaStatus(
               await extractPdf(asset.id, setMediaStatus, controller.signal),
             );
             setMediaRevision((n) => n + 1);
           } catch (e) {
+            controller.signal.throwIfAborted();
             setMediaStatus(
               "PDF uploaded. Text extraction failed; use Re-extract text to retry.",
             );
-            throw e;
+            setError(
+              `${file.name}: ${message(e)}. Use Re-extract text to retry.`,
+            );
           }
         } else setMediaStatus(`${file.name} uploaded`);
       }
@@ -1376,6 +1379,7 @@ export default function Canvas({
           <Suspense fallback={<aside className="reader">Opening PDF…</aside>}>
             <PdfPanel
               assetId={pdf.id}
+              mediaRevision={mediaRevision}
               initialPage={pdf.page}
               onClose={() => setPdf(undefined)}
             />
