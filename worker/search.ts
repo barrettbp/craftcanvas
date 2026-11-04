@@ -86,6 +86,7 @@ type Row = {
   board_id: string | null;
   title: string;
   snippet: string;
+  snippet_norm: string;
   score: number;
 };
 
@@ -98,7 +99,8 @@ export async function search(db: D1Database, query: string, opts: { limit?: numb
   const rows = await db
     .prepare(
       `SELECT d.key, d.doc_kind, d.doc_id, d.page, d.board_id, d.title,
-              snippet(search_fts, -1, '<mark>', '</mark>', '…', 20) AS snippet,
+              snippet(search_fts, 1, '<mark>', '</mark>', '…', 20) AS snippet,
+              snippet(search_fts, 2, '<mark>', '</mark>', '…', 20) AS snippet_norm,
               bm25(search_fts, 4.0, 1.0, 1.0) AS score
        FROM search_fts JOIN search_docs d ON d.id = search_fts.rowid
        WHERE search_fts MATCH ? AND d.doc_kind IN (${placeholders})
@@ -143,7 +145,8 @@ export async function search(db: D1Database, query: string, opts: { limit?: numb
       id: r.key,
       kind: r.doc_kind,
       title: r.title,
-      snippet: r.snippet,
+      // Prefer the original text; fall back to the diacritics-folded column when only it matched (e.g. đ vs d).
+      snippet: r.snippet.includes("<mark>") ? r.snippet : r.snippet_norm,
       boardIds: Array.from(boardsOf.get(groupKey) ?? []),
       score: Number(r.score),
     };
