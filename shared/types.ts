@@ -53,6 +53,8 @@ export type Card = {
   folded: boolean;
   sectionId: string | null;
   z: number;
+  /** Preset id ("1".."6") or hex; null = none. */
+  color: string | null;
 };
 
 export type Section = {

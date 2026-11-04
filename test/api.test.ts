@@ -202,7 +202,7 @@ describe("boards, cards, sections, connections", () => {
     const res = await req(`/api/boards/${board.id}/cards`, { method: "POST", body: JSON.stringify({ noteId: "n-heptabase", x: 10, y: 20 }) });
     expect(res.status).toBe(201);
     card = (await res.json()) as Card;
-    expect(card).toMatchObject({ noteId: "n-heptabase", x: 10, y: 20, w: 260, h: 160, folded: false, sectionId: null });
+    expect(card).toMatchObject({ noteId: "n-heptabase", x: 10, y: 20, w: 260, h: 160, folded: false, sectionId: null, color: null });
     const dup = await req(`/api/boards/${board.id}/cards`, { method: "POST", body: JSON.stringify({ noteId: "n-heptabase", x: 0, y: 0 }) });
     expect(dup.status).toBe(409);
     const unknown = await req(`/api/boards/${board.id}/cards`, { method: "POST", body: JSON.stringify({ noteId: "nope", x: 0, y: 0 }) });
@@ -214,7 +214,7 @@ describe("boards, cards, sections, connections", () => {
   it("bulk-updates card positions and fold state", async () => {
     const res = await req(`/api/boards/${board.id}/cards`, {
       method: "PUT",
-      body: JSON.stringify({ cards: [{ id: card.id, x: 111, y: 222, folded: true }, { id: "missing", x: 1 }] }),
+      body: JSON.stringify({ cards: [{ id: card.id, x: 111, y: 222, folded: true, color: "3" }, { id: "missing", x: 1 }] }),
     });
     expect(await res.json()).toEqual({ updated: 1 });
   });
@@ -250,7 +250,7 @@ describe("boards, cards, sections, connections", () => {
     expect(detail.cardCount).toBe(2);
     expect(detail.cards.length).toBe(2);
     expect(detail.notes.map((n) => n.id).sort()).toEqual(["n-canvas-perf", "n-heptabase"]);
-    expect(detail.cards.find((c) => c.id === card.id)).toMatchObject({ x: 111, y: 222, folded: true });
+    expect(detail.cards.find((c) => c.id === card.id)).toMatchObject({ x: 111, y: 222, folded: true, color: "3" });
     const onBoards = (await (await req("/api/notes/n-heptabase/boards")).json()) as { items: { boardId: string }[] };
     expect(onBoards.items.map((b) => b.boardId)).toEqual([board.id]);
   });

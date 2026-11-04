@@ -5,7 +5,7 @@ import { SUMMARY_SELECT, rowToSummary } from "./notes";
 import type { Board, BoardDetail, Card, Connection, ConnectionKind, Section } from "../../shared/types";
 
 type BoardRow = { id: string; name: string; viewport_x: number; viewport_y: number; viewport_zoom: number; created_at: string; updated_at: string; card_count?: number };
-type CardRow = { id: string; board_id: string; note_id: string; x: number; y: number; w: number; h: number; folded: number; section_id: string | null; z: number };
+type CardRow = { id: string; board_id: string; note_id: string; x: number; y: number; w: number; h: number; folded: number; section_id: string | null; z: number; color: string | null };
 type SectionRow = { id: string; board_id: string; name: string; x: number; y: number; w: number; h: number; color: string | null };
 type ConnRow = { id: string; board_id: string; source_note_id: string; target_note_id: string; kind: ConnectionKind; label: string | null };
 
@@ -17,7 +17,7 @@ const toBoard = (r: BoardRow): Board => ({
   createdAt: r.created_at,
   updatedAt: r.updated_at,
 });
-const toCard = (r: CardRow): Card => ({ id: r.id, boardId: r.board_id, noteId: r.note_id, x: r.x, y: r.y, w: r.w, h: r.h, folded: r.folded === 1, sectionId: r.section_id, z: r.z });
+const toCard = (r: CardRow): Card => ({ id: r.id, boardId: r.board_id, noteId: r.note_id, x: r.x, y: r.y, w: r.w, h: r.h, folded: r.folded === 1, sectionId: r.section_id, z: r.z, color: r.color ?? null });
 const toSection = (r: SectionRow): Section => ({ id: r.id, boardId: r.board_id, name: r.name, x: r.x, y: r.y, w: r.w, h: r.h, color: r.color });
 const toConn = (r: ConnRow): Connection => ({ id: r.id, boardId: r.board_id, sourceNoteId: r.source_note_id, targetNoteId: r.target_note_id, kind: r.kind, label: r.label });
 
@@ -133,8 +133,9 @@ boards.post("/boards/:id/cards", async (c) => {
   const w = isFiniteNumber(body.w) ? body.w : 260;
   const h = isFiniteNumber(body.h) ? body.h : 160;
   const zRow = await c.env.DB.prepare("SELECT COALESCE(MAX(z), 0) + 1 AS z FROM cards WHERE board_id = ?").bind(boardId).first<{ z: number }>();
-  await c.env.DB.prepare("INSERT INTO cards (id, board_id, note_id, x, y, w, h, folded, section_id, z) VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, ?)")
-    .bind(id, boardId, noteId, body.x, body.y, w, h, zRow?.z ?? 1)
+  const color = typeof body.color === "string" ? body.color.slice(0, 32) : null;
+  await c.env.DB.prepare("INSERT INTO cards (id, board_id, note_id, x, y, w, h, folded, section_id, z, color) VALUES (?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)")
+    .bind(id, boardId, noteId, body.x, body.y, w, h, zRow?.z ?? 1, color)
     .run();
   await touch(c.env.DB, boardId);
   const row = await c.env.DB.prepare("SELECT * FROM cards WHERE id = ?").bind(id).first<CardRow>();
@@ -166,6 +167,10 @@ boards.put("/boards/:id/cards", async (c) => {
     if (it.sectionId === null || typeof it.sectionId === "string") {
       sets.push("section_id = ?");
       binds.push(it.sectionId);
+    }
+    if (it.color === null || typeof it.color === "string") {
+      sets.push("color = ?");
+      binds.push(it.color === null ? null : String(it.color).slice(0, 32));
     }
     if (!sets.length) continue;
     binds.push(it.id, boardId);

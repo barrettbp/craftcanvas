@@ -24,11 +24,11 @@ Suggested relations (phase 5, optional): Workers AI text embeddings (`@cf/baai/b
 | Area | Owner | Branch |
 |---|---|---|
 | Repo, scaffold, Worker, auth, D1 schema, Craft client, sync, API, tests, deploy | Claude | `main` |
-| Design, SPA, canvas, login screen, boards UI, side panel, search, sections, minimap | Codex | `codex/frontend` (and `codex/*` follow-ups) |
-| Review gate: every Codex commit is reviewed by Claude for secrets, auth bypass, API misuse, build/test pass, before merge to `main` | Claude | — |
+| Design, SPA, canvas, login screen, boards UI, side panel, search, sections, minimap | Codex | `codex/frontend`, opened as PRs against `main` |
+| Review gate: every Codex PR is reviewed by Claude for secrets, auth bypass, API misuse, build/test pass, before merge to `main` | Claude | — |
 | Credentials, Cloudflare login, scope decision, AI decision | Barrett | — |
 
-Contract between the two sides: `docs/API.md`. The frontend talks only to `/api/*` with the session cookie. It never sees Craft.
+Contract between the two sides: `docs/API.md`. The frontend talks only to `/api/*` with the session cookie. It never sees Craft. Barrett relays messages between Claude and Codex; PR links are pasted to Claude for review.
 
 ## 3. Phases and acceptance checks
 

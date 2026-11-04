@@ -47,8 +47,8 @@ type Link = {
 - `GET /api/boards/:id` → `BoardDetail` (board + cards + sections + connections + the `NoteSummary` of every card's note).
 - `PATCH /api/boards/:id` body `{"name"?: string, "viewport"?: {"x","y","zoom"}}` → `Board`.
 - `DELETE /api/boards/:id` → `204`.
-- `POST /api/boards/:id/cards` body `{"noteId": string, "x": number, "y": number, "w"?: number, "h"?: number}` → `201 Card`. `409` if the note is already on the board.
-- `PUT /api/boards/:id/cards` body `{"cards": Partial<Card> & {"id": string}[]}` → `{"updated": number}`. Bulk position/size/fold/section update after a drag; send only changed cards, debounce ~300 ms.
+- `POST /api/boards/:id/cards` body `{"noteId": string, "x": number, "y": number, "w"?: number, "h"?: number, "color"?: string}` → `201 Card`. `409` if the note is already on the board.
+- `PUT /api/boards/:id/cards` body `{"cards": Partial<Card> & {"id": string}[]}` → `{"updated": number}`. Bulk position/size/fold/section/color update after a drag; send only changed cards, debounce ~300 ms.
 - `DELETE /api/boards/:id/cards/:cardId` → `204`.
 - `POST /api/boards/:id/sections` body `{"name","x","y","w","h","color"?}` → `201 Section`.
 - `PATCH /api/boards/:id/sections/:sectionId` body partial Section → `Section`.
@@ -60,7 +60,7 @@ type Link = {
 type Board = { id: string; name: string; viewport: { x: number; y: number; zoom: number };
                cardCount: number; createdAt: string; updatedAt: string }
 type Card = { id: string; boardId: string; noteId: string; x: number; y: number; w: number; h: number;
-              folded: boolean; sectionId: string | null; z: number }
+              folded: boolean; sectionId: string | null; z: number; color: string | null }  // color: preset "1".."6" or hex
 type Section = { id: string; boardId: string; name: string; x: number; y: number; w: number; h: number; color: string | null }
 type Connection = { id: string; boardId: string; sourceNoteId: string; targetNoteId: string;
                     kind: "manual" | "suggested" | "accepted"; label: string | null }
