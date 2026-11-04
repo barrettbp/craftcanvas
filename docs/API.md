@@ -176,4 +176,4 @@ Full-text search with diacritics folded (so "viet" finds "Việt") and prefix ma
 ## MCP (read-only, for Claude / ChatGPT)
 
 - Endpoint: `POST /mcp` (Streamable HTTP, stateless). Auth: `Authorization: Bearer <MCP_TOKEN>`; without it `401` + `WWW-Authenticate: Bearer`. Experimental fallback for clients that cannot set headers: `POST /mcp/<MCP_TOKEN>`. The session cookie is not used here.
-- Tools: `list_boards`, `get_board`, `search`, `fetch`, `get_pdf_pages`, `list_relationships` (see docs/PLAN-PHASE2.md §5). No write tools.
+- Tools: `list_boards`, `get_board`, `search`, `fetch`, `get_pdf_pages`, `list_relationships` (see docs/PLAN-PHASE2.md §5). No write tools. `fetch` pages long text: `{id, offset?, maxChars?}` (default 20 000 chars, max 60 000) and returns `textRange: {offset, length, totalChars, truncated, nextOffset}`.

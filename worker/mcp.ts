@@ -22,6 +22,22 @@ const notFound = (what: string) => ({ content: [{ type: "text" as const, text: `
 const FETCH_PDF_PAGES = 10;
 const FETCH_TEXT_CHARS = 60_000;
 const PAGES_TEXT_CHARS = 100_000;
+/** Default and maximum size of the `text` field returned by fetch; longer items are paged with `offset`. */
+const FETCH_DEFAULT_CHARS = 20_000;
+const FETCH_MAX_CHARS = 60_000;
+
+/** Slice an item's text for paging and annotate the result. */
+function pageText(item: Record<string, unknown>, offset: number, maxChars: number): Record<string, unknown> {
+  const full = typeof item.text === "string" ? item.text : "";
+  const start = Math.min(Math.max(0, offset), full.length);
+  const end = Math.min(full.length, start + maxChars);
+  const truncated = end < full.length;
+  return {
+    ...item,
+    text: full.slice(start, end),
+    textRange: { offset: start, length: end - start, totalChars: full.length, truncated, nextOffset: truncated ? end : null },
+  };
+}
 
 function joinPages(pages: { page: number; text: string }[], maxChars: number): { text: string; included: number; truncated: boolean } {
   let out = "";
@@ -297,13 +313,19 @@ export function buildMcpServer(ctx: Ctx): McpServer {
   server.registerTool(
     "fetch",
     {
-      description: "Fetch the full content of one item by id: note:<id> (Craft note markdown with its links), object:<id> (local card/text/image/pdf/youtube), card:<id>, asset:<id> or pdf_page:<assetId>:<page> (PDF text), board:<id>.",
-      inputSchema: { id: z.string().min(1) },
+      description:
+        "Fetch the full content of one item by id: note:<id> (Craft note markdown with its links), object:<id> (local card/text/card/image/pdf/youtube), card:<id>, asset:<id> or pdf_page:<assetId>:<page> (PDF text), board:<id>. Long text is paged: the reply's textRange says if it was truncated and which offset to pass next.",
+      inputSchema: {
+        id: z.string().min(1),
+        offset: z.number().int().min(0).optional().describe("Character offset into the item's text (default 0)"),
+        maxChars: z.number().int().min(1000).max(FETCH_MAX_CHARS).optional().describe(`Characters of text to return (default ${FETCH_DEFAULT_CHARS}, max ${FETCH_MAX_CHARS})`),
+      },
       annotations: ro,
     },
-    async ({ id }) => {
+    async ({ id, offset, maxChars }) => {
       const item = await fetchItem(ctx, id);
-      return item ? text(item) : notFound(id);
+      if (!item) return notFound(id);
+      return text("text" in item ? pageText(item, offset ?? 0, maxChars ?? FETCH_DEFAULT_CHARS) : item);
     },
   );
 

@@ -289,3 +289,23 @@ describe("review fixes", () => {
     await req(`/api/boards/${b.id}`, { method: "DELETE" });
   });
 });
+
+describe("MCP fetch paging", () => {
+  const H = { "content-type": "application/json", accept: "application/json, text/event-stream", authorization: "Bearer test-mcp-token-0123456789" };
+  it("pages long text with offset and reports the range", async () => {
+    await login();
+    await syncAll();
+    const b = await json<Board>(req("/api/boards", { method: "POST", body: JSON.stringify({ name: "Paging" }) }));
+    const long = "word ".repeat(6000); // 30 000 chars
+    const o = await json<CanvasObject>(req(`/api/boards/${b.id}/objects`, { method: "POST", body: JSON.stringify({ kind: "card", x: 0, y: 0, title: "Long", text: long }) }));
+    const call = (args: Record<string, unknown>) =>
+      app.request("https://craftcanvas.test/mcp", { method: "POST", headers: H, body: JSON.stringify({ jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "fetch", arguments: args } }) }, E);
+    const first = ((await (await call({ id: `object:${o.id}` })).json()) as { result: { structuredContent: { text: string; textRange: { truncated: boolean; nextOffset: number | null; totalChars: number } } } }).result.structuredContent;
+    expect(first.text.length).toBe(20_000);
+    expect(first.textRange).toMatchObject({ truncated: true, nextOffset: 20_000, totalChars: 30_000 });
+    const second = ((await (await call({ id: `object:${o.id}`, offset: 20_000 })).json()) as { result: { structuredContent: { text: string; textRange: { truncated: boolean; nextOffset: number | null } } } }).result.structuredContent;
+    expect(second.text.length).toBe(10_000);
+    expect(second.textRange).toMatchObject({ truncated: false, nextOffset: null });
+    await req(`/api/boards/${b.id}`, { method: "DELETE" });
+  });
+});
