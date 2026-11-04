@@ -96,3 +96,16 @@ describe("runSyncStep with a flaky source", () => {
     await db.prepare("DELETE FROM notes WHERE id IN ('a','b','c','old')").run();
   });
 });
+
+describe("CraftClient without an injected fetch", () => {
+  it("invokes the global fetch correctly (no Illegal invocation)", async () => {
+    const client = new CraftClient({ connectionUrl: "https://invalid.localhost.test/api/v1", minGapMs: 0, maxRetries: 0 });
+    let message = "";
+    try {
+      await client.listFolders();
+    } catch (e) {
+      message = String((e as Error).message);
+    }
+    expect(message).not.toContain("Illegal invocation");
+  });
+});

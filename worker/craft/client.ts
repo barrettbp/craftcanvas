@@ -46,7 +46,8 @@ export class CraftClient {
     this.token = opts.token;
     this.minGapMs = opts.minGapMs ?? 700;
     this.maxRetries = opts.maxRetries ?? 4;
-    this.fetchImpl = opts.fetchImpl ?? fetch;
+    // Workers require fetch to be invoked on the global; storing it on `this` would throw "Illegal invocation".
+    this.fetchImpl = opts.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
   }
 
   private async request(path: string, params: Record<string, string> = {}, accept = "application/json"): Promise<Response> {
