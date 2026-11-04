@@ -43,7 +43,11 @@ export async function syncStatus(env: Bindings, mode: "fixture" | "craft"): Prom
   const db = env.DB;
   const [notes, links, last, running] = await Promise.all([
     db.prepare("SELECT COUNT(*) AS n FROM notes WHERE deleted = 0").first<{ n: number }>(),
-    db.prepare("SELECT COUNT(*) AS n FROM links WHERE target_note_id IS NOT NULL").first<{ n: number }>(),
+    db
+      .prepare(
+        "SELECT COUNT(*) AS n FROM links l JOIN notes s ON s.id = l.source_note_id AND s.deleted = 0 JOIN notes t ON t.id = l.target_note_id AND t.deleted = 0",
+      )
+      .first<{ n: number }>(),
     getState(db, "last_sync_at"),
     getState(db, "running_since"),
   ]);
