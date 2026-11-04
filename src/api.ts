@@ -1,7 +1,7 @@
 import type {
   ApiError,
   Board,
-  BoardDetail,
+  BoardDetailV2,
   Card,
   Link,
   Note,
@@ -54,7 +54,7 @@ export const boardPath = (id: string) =>
   `/api/boards/${encodeURIComponent(id)}`;
 export const api = {
   boards: () => request<{ items: Board[] }>("/api/boards"),
-  board: (id: string) => request<BoardDetail>(boardPath(id)),
+  board: (id: string) => request<BoardDetailV2>(boardPath(id)),
   notes: (q: string, offset = 0, signal?: AbortSignal) =>
     request<{ items: NoteSummary[]; total: number }>(
       `/api/notes?q=${encodeURIComponent(q)}&limit=50&offset=${offset}`,
