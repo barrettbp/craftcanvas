@@ -109,3 +109,85 @@ export type SyncStatus = {
 };
 
 export type ApiError = { error: string; message?: string };
+
+// ---------- Phase 2 ----------
+
+export type ObjectKind = "text" | "card" | "image" | "pdf" | "youtube";
+
+export type CanvasObject = {
+  id: string;
+  boardId: string;
+  kind: ObjectKind;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  z: number;
+  sectionId: string | null;
+  color: string | null;
+  title: string | null;
+  text: string | null;
+  url: string | null;
+  assetId: string | null;
+  meta: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ArrowEndKind = "card" | "object";
+export type ArrowEnd = { kind: ArrowEndKind; id: string };
+export type ArrowType = "parent_child" | "related" | "custom";
+
+export type Arrow = {
+  id: string;
+  boardId: string;
+  source: ArrowEnd;
+  target: ArrowEnd;
+  type: ArrowType;
+  label: string | null;
+  color: string | null;
+  sourceHandle: string | null;
+  targetHandle: string | null;
+  createdAt: string;
+};
+
+export type AssetKind = "image" | "pdf";
+
+export type Asset = {
+  id: string;
+  kind: AssetKind;
+  filename: string;
+  contentType: string;
+  size: number;
+  url: string;
+  width: number | null;
+  height: number | null;
+  pageCount: number | null;
+  textStatus: "none" | "pending" | "done";
+  createdAt: string;
+};
+
+export type YouTubeMeta = {
+  videoId: string;
+  url: string;
+  embedUrl: string;
+  title: string | null;
+  author: string | null;
+  thumbnailUrl: string | null;
+};
+
+export type SearchKind = "note" | "object" | "pdf_page";
+
+export type SearchResult = {
+  id: string;
+  kind: SearchKind;
+  objectKind?: ObjectKind;
+  title: string;
+  snippet: string;
+  boardIds: string[];
+  page?: number;
+  assetId?: string;
+  score: number;
+};
+
+export type BoardDetailV2 = BoardDetail & { objects: CanvasObject[]; arrows: Arrow[] };

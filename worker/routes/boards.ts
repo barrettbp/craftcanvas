@@ -2,7 +2,9 @@ import { Hono, type Context } from "hono";
 import type { AppEnv } from "../env";
 import { isFiniteNumber, newId, nowIso } from "../util";
 import { SUMMARY_SELECT, rowToSummary } from "./notes";
-import type { Board, BoardDetail, Card, Connection, ConnectionKind, Section } from "../../shared/types";
+import type { Board, BoardDetailV2, Card, Connection, ConnectionKind, Section } from "../../shared/types";
+import { toObject, type ObjectRow } from "./objects";
+import { toArrow, type ArrowRow } from "./arrows";
 
 type BoardRow = { id: string; name: string; viewport_x: number; viewport_y: number; viewport_zoom: number; created_at: string; updated_at: string; card_count?: number };
 type CardRow = { id: string; board_id: string; note_id: string; x: number; y: number; w: number; h: number; folded: number; section_id: string | null; z: number; color: string | null };
@@ -64,18 +66,22 @@ boards.get("/boards/:id", async (c) => {
   const id = c.req.param("id");
   const row = await boardOr404(c, id);
   if (!row) return c.json({ error: "not_found" }, 404);
-  const [cards, sections, conns, notes] = await Promise.all([
+  const [cards, sections, conns, notes, objs, arrs] = await Promise.all([
     c.env.DB.prepare("SELECT * FROM cards WHERE board_id = ? ORDER BY z, id").bind(id).all<CardRow>(),
     c.env.DB.prepare("SELECT * FROM sections WHERE board_id = ? ORDER BY id").bind(id).all<SectionRow>(),
     c.env.DB.prepare("SELECT * FROM connections WHERE board_id = ? ORDER BY id").bind(id).all<ConnRow>(),
     c.env.DB.prepare(`${SUMMARY_SELECT} WHERE n.id IN (SELECT note_id FROM cards WHERE board_id = ?)`).bind(id).all(),
+    c.env.DB.prepare("SELECT * FROM objects WHERE board_id = ? ORDER BY z, id").bind(id).all<ObjectRow>(),
+    c.env.DB.prepare("SELECT * FROM arrows WHERE board_id = ? ORDER BY created_at, id").bind(id).all<ArrowRow>(),
   ]);
-  const detail: BoardDetail = {
+  const detail: BoardDetailV2 = {
     ...toBoard(row),
     cards: (cards.results ?? []).map(toCard),
     sections: (sections.results ?? []).map(toSection),
     connections: (conns.results ?? []).map(toConn),
     notes: (notes.results ?? []).map((r) => rowToSummary(r as never)),
+    objects: (objs.results ?? []).map(toObject),
+    arrows: (arrs.results ?? []).map(toArrow),
   };
   return c.json(detail);
 });
@@ -106,13 +112,16 @@ boards.patch("/boards/:id", async (c) => {
 
 boards.delete("/boards/:id", async (c) => {
   const id = c.req.param("id");
-  const r = await c.env.DB.prepare("DELETE FROM boards WHERE id = ?").bind(id).run();
-  if (!r.meta.changes) return c.json({ error: "not_found" }, 404);
-  // D1 enforces foreign keys, but be explicit in case PRAGMA differs locally.
+  if (!(await boardOr404(c, id))) return c.json({ error: "not_found" }, 404);
+  // Search entries first (the subquery needs the objects), then children, then the board itself.
   await c.env.DB.batch([
+    c.env.DB.prepare("DELETE FROM search_docs WHERE doc_kind = 'object' AND doc_id IN (SELECT id FROM objects WHERE board_id = ?)").bind(id),
+    c.env.DB.prepare("DELETE FROM arrows WHERE board_id = ?").bind(id),
+    c.env.DB.prepare("DELETE FROM objects WHERE board_id = ?").bind(id),
+    c.env.DB.prepare("DELETE FROM connections WHERE board_id = ?").bind(id),
     c.env.DB.prepare("DELETE FROM cards WHERE board_id = ?").bind(id),
     c.env.DB.prepare("DELETE FROM sections WHERE board_id = ?").bind(id),
-    c.env.DB.prepare("DELETE FROM connections WHERE board_id = ?").bind(id),
+    c.env.DB.prepare("DELETE FROM boards WHERE id = ?").bind(id),
   ]);
   return c.body(null, 204);
 });
@@ -189,7 +198,12 @@ boards.put("/boards/:id/cards", async (c) => {
 });
 
 boards.delete("/boards/:id/cards/:cardId", async (c) => {
-  const r = await c.env.DB.prepare("DELETE FROM cards WHERE id = ? AND board_id = ?").bind(c.req.param("cardId"), c.req.param("id")).run();
+  const cardId = c.req.param("cardId");
+  const res = await c.env.DB.batch([
+    c.env.DB.prepare("DELETE FROM arrows WHERE board_id = ? AND ((source_kind = 'card' AND source_id = ?) OR (target_kind = 'card' AND target_id = ?))").bind(c.req.param("id"), cardId, cardId),
+    c.env.DB.prepare("DELETE FROM cards WHERE id = ? AND board_id = ?").bind(cardId, c.req.param("id")),
+  ]);
+  const r = res[1];
   if (!r.meta.changes) return c.json({ error: "not_found" }, 404);
   await touch(c.env.DB, c.req.param("id"));
   return c.body(null, 204);

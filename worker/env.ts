@@ -1,6 +1,8 @@
 export type Bindings = {
   DB: D1Database;
   ASSETS: Fetcher;
+  /** R2 bucket for uploaded images and PDFs. */
+  BUCKET: R2Bucket;
   /** "auto" | "fixture" | "craft". auto = craft when CRAFT_CONNECTION_URL is set, else fixture. */
   CRAFT_MODE?: string;
   APP_PASSWORD?: string;
@@ -9,6 +11,8 @@ export type Bindings = {
   CRAFT_CONNECTION_URL?: string;
   /** Secret, optional. Bearer token if the Craft connection page shows a separate credential. */
   CRAFT_API_TOKEN?: string;
+  /** Secret. Token for the read-only MCP endpoint (bearer header or /mcp/<token> path). */
+  MCP_TOKEN?: string;
 };
 
 export type AppEnv = { Bindings: Bindings };

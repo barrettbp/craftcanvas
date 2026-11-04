@@ -14,6 +14,8 @@ The backend ships first on `main`; until it lands, build against the types in `s
 6. **YouTube.** Tool "Video" or paste a YouTube URL onto the canvas (paste handler): `POST /objects {kind:"youtube", url}`; render the iframe from `meta.embedUrl` with the title above it. The iframe must not capture canvas drags: wrap it so dragging happens from the card's title bar.
 7. **Search panel.** Switch the "Add notes" search to `GET /api/search` so results include Craft notes, canvas cards, text and PDF pages, with the `<mark>` snippet rendered safely (only `<mark>` allowed; escape everything else). Notes still add a card; PDF-page results open the page in the viewer; object results pan to the object.
 
+8. **Deep links from AI answers.** The MCP server cites canvas items as `https://<host>/#/board/<boardId>?focus=<cardId|objectId>` and PDF pages as `/api/assets/<id>#page=<n>`. Handle the hash route on load: open that board, pan to and select the focused card/object (ids are raw, without the `note:`/`object:` prefix). Keep the existing in-app navigation unchanged otherwise.
+
 ## Constraints
 
 - Objects obey the same viewport culling and 180-visible cap as cards; PDF first-page rendering and YouTube iframes must be lazy (render only when visible) so dense boards stay fast.

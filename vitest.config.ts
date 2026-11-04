@@ -14,6 +14,7 @@ export default defineConfig(async () => {
             APP_PASSWORD: "test-password",
             SESSION_SECRET: "test-session-secret-at-least-32-chars-long",
             CRAFT_MODE: "fixture",
+            MCP_TOKEN: "test-mcp-token-0123456789",
           },
         },
       }),

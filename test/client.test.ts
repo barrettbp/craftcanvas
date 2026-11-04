@@ -102,6 +102,11 @@ describe("runSyncStep with a flaky source", () => {
 
 describe("CraftClient without an injected fetch", () => {
   it("invokes the global fetch correctly (no Illegal invocation)", async () => {
+    // Same call shape as production (no injected fetchImpl) but with the global stubbed so no network is touched.
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      throw new TypeError("fetch failed");
+    }) as typeof fetch;
     const client = new CraftClient({ connectionUrl: "https://invalid.localhost.test/api/v1", minGapMs: 0, maxRetries: 0 });
     let message = "";
     try {
@@ -109,6 +114,8 @@ describe("CraftClient without an injected fetch", () => {
     } catch (e) {
       message = String((e as Error).message);
     }
+    globalThis.fetch = realFetch;
+    expect(message).toBe("fetch failed");
     expect(message).not.toContain("Illegal invocation");
   });
 });
