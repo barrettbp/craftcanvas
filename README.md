@@ -2,7 +2,8 @@
 
 A private, read-only canvas over your Craft notes, in the style of Heptabase. Notes are cards on an infinite board, existing `block://` links are drawn as arrows, and boards, card positions and sections are saved in the tool's own storage. Nothing is written to Craft.
 
-- Plan, stack and data model: [docs/PLAN.md](docs/PLAN.md)
+- Phase 1 plan, stack and data model: [docs/PLAN.md](docs/PLAN.md)
+- Phase 2 plan (objects, arrows, uploads, YouTube, MCP): [docs/PLAN-PHASE2.md](docs/PLAN-PHASE2.md)
 - API contract for the frontend: [docs/API.md](docs/API.md)
 
 ## Stack
@@ -66,8 +67,44 @@ npx wrangler secret put CRAFT_CONNECTION_URL
 
 `CRAFT_API_TOKEN` is optional (API Key mode only). The Worker URL is printed by `wrangler deploy` as `https://craftcanvas.<account>.workers.dev`. Anonymous visitors see only the login form.
 
+## Phase 2: canvas objects, uploads and MCP
+
+Phase 2 adds the tool's own content next to Craft notes: free text, editable cards, image and PDF uploads (stored in the R2 bucket `craftcanvas-uploads`, served only behind the login), YouTube embeds, and arrows with a type and label. A full-text index (D1 FTS5, diacritics folded) covers Craft notes, local objects and PDF page text.
+
+One-time setup on the account:
+
+```bash
+npx wrangler r2 bucket create craftcanvas-uploads
+```
+
+```bash
+npm run db:migrate:remote
+```
+
+### Read-only MCP server for Claude and ChatGPT
+
+The Worker serves a Model Context Protocol endpoint (Streamable HTTP, stateless) with six read-only tools: `list_boards`, `get_board`, `search`, `fetch`, `get_pdf_pages`, `list_relationships`. There are no write tools.
+
+Set the token once (the command prompts for the value):
+
+```bash
+npx wrangler secret put MCP_TOKEN
+```
+
+Connect a client, either way:
+
+- **Header form**: server URL `https://<worker>.workers.dev/mcp` with the request header `Authorization: Bearer <MCP_TOKEN>` (Claude custom connectors: the "Request headers" option, where available).
+- **Path form**: server URL `https://<worker>.workers.dev/mcp/<MCP_TOKEN>` added as a connector with no sign-in. This works with Claude on every plan and with ChatGPT's "Create MCP App", which cannot send API keys. The token sits in the URL, so treat that URL like a password and rotate it with `wrangler secret put MCP_TOKEN` if it leaks.
+
+Quick check from a terminal:
+
+```bash
+curl -s https://<worker>.workers.dev/mcp -H "Authorization: Bearer $MCP_TOKEN" -H 'Content-Type: application/json' -H 'Accept: application/json, text/event-stream' -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
 ## Secrets and privacy
 
 - The Craft connection URL and key are Worker secrets. They never reach the browser, the repo, or logs; error messages strip URLs.
 - Sessions are HMAC-signed cookies (`HttpOnly`, `Secure`, `SameSite=Lax`, 14 days). Logout clears the cookie; to revoke every session, rotate `SESSION_SECRET`. Login is throttled to 5 attempts per minute per IP per isolate, so keep `APP_PASSWORD` long and random.
 - The Worker only ever sends GET requests to Craft, paced at one request per 700 ms with `Retry-After` backoff.
+- Uploads are private: there is no public bucket URL, and `/api/assets/:id` requires the session cookie. The MCP endpoint links to those URLs, so an AI client can cite a PDF page but cannot download the file.

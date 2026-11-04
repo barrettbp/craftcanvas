@@ -10,6 +10,7 @@ import type { DocRef } from "./craft/parse";
 import { cleanMarkdown, deepLinks, extractLinks, makePreview, titleFromMarkdown } from "./craft/parse";
 import type { NoteSource } from "./craft/source";
 import { CraftApiError } from "./craft/client";
+import { indexStatement, noteIndexDoc, removeStatement } from "./search";
 import { nowIso } from "./util";
 import type { SyncResult, SyncStatus } from "../shared/types";
 
@@ -120,6 +121,7 @@ export async function runSyncStep(env: Bindings, source: NoteSource, cursor: str
         )
         .bind(doc.id, pending.spaceId, title, doc.folderId, doc.folderName, doc.createdAt, doc.modifiedAt, markdown, preview, dl.app, dl.web, syncedAt),
     );
+    stmts.push(indexStatement(db, noteIndexDoc(doc.id, title, doc.markdown)));
     stmts.push(db.prepare("DELETE FROM links WHERE source_note_id = ?").bind(doc.id));
     for (const l of extractLinks(doc.markdown)) {
       stmts.push(
@@ -158,9 +160,15 @@ export async function runSyncStep(env: Bindings, source: NoteSource, cursor: str
       db.prepare("INSERT INTO sync_state (key, value) VALUES ('last_sync_at', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").bind(nowIso()),
       db.prepare("DELETE FROM sync_state WHERE key IN ('pending', 'running_since')"),
     ];
-    for (const id of gone) finish.push(db.prepare("UPDATE notes SET deleted = 1 WHERE id = ?").bind(id));
+    for (const id of gone) {
+      finish.push(db.prepare("UPDATE notes SET deleted = 1 WHERE id = ?").bind(id));
+      finish.push(removeStatement(db, "note", id));
+    }
     // Real data replaces the bundled samples.
-    if (source.mode === "craft") finish.push(db.prepare("UPDATE notes SET deleted = 1 WHERE space_id = 'fixture-space'"));
+    if (source.mode === "craft") {
+      finish.push(db.prepare("DELETE FROM search_docs WHERE doc_kind = 'note' AND doc_id IN (SELECT id FROM notes WHERE space_id = 'fixture-space')"));
+      finish.push(db.prepare("UPDATE notes SET deleted = 1 WHERE space_id = 'fixture-space'"));
+    }
     for (let i = 0; i < finish.length; i += 90) await db.batch(finish.slice(i, i + 90));
   } else {
     await setState(db, "pending", JSON.stringify(pending));

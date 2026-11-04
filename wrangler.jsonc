@@ -14,6 +14,9 @@
     // The Worker sees every request so the auth gate covers the SPA shell and its assets too.
     "run_worker_first": true
   },
+  "r2_buckets": [
+    { "binding": "BUCKET", "bucket_name": "craftcanvas-uploads" }
+  ],
   "d1_databases": [
     {
       "binding": "DB",
@@ -25,7 +28,7 @@
   ],
   "vars": {
     // "fixture" serves bundled sample notes; "craft" reads from the Craft API (needs CRAFT_CONNECTION_URL secret).
-    // Secrets (never here): APP_PASSWORD, SESSION_SECRET, CRAFT_CONNECTION_URL, optional CRAFT_API_TOKEN.
+    // Secrets (never here): APP_PASSWORD, SESSION_SECRET, CRAFT_CONNECTION_URL, optional CRAFT_API_TOKEN, MCP_TOKEN.
     "CRAFT_MODE": "auto"
   }
 }
